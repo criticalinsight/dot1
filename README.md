@@ -2,7 +2,7 @@
 
 A lean, edge-native Kanban board for content management pipelines.
 
-**Live:** [velocity-frontend.pages.dev](https://e7c5d55d.velocity-frontend.pages.dev) | **API:** [velocity-backend.iamkingori.workers.dev](https://velocity-backend.iamkingori.workers.dev)
+**Live:** [dot1.pages.dev](https://dot1-e8r.pages.dev) | **API:** [dot1-backend.iamkingori.workers.dev](https://dot1-backend.iamkingori.workers.dev)
 
 ## Quick Start
 

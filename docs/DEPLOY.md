@@ -4,8 +4,8 @@
 
 | Service | URL |
 |---------|-----|
-| Frontend | https://e7c5d55d.velocity-frontend.pages.dev |
-| Backend | https://velocity-backend.iamkingori.workers.dev |
+| Frontend | https://dot1-e8r.pages.dev |
+| Backend | https://dot1-backend.iamkingori.workers.dev |
 
 - Node.js 20+
 - Cloudflare account with Workers paid plan (for Durable Objects)

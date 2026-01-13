@@ -7,7 +7,7 @@ import { PGlite } from '@electric-sql/pglite';
 export const db = new PGlite();
 
 /** Backend API endpoint */
-const BACKEND_URL = 'https://backend.iamkingori.workers.dev';
+const BACKEND_URL = 'https://dot1-backend.iamkingori.workers.dev';
 
 /** WebSocket connection state */
 let wsConnection: WebSocket | null = null;
