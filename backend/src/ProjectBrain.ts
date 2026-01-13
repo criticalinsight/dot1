@@ -4,6 +4,7 @@ import { getPromptForTask } from './prompts';
 
 interface Env {
   GEMINI_API_KEY?: string;
+  TELEGRAM_BOT_TOKEN?: string;
 }
 
 /**
@@ -64,6 +65,10 @@ export class ProjectBrain {
         createdAt TEXT NOT NULL,
         updatedAt TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS system_settings(
+        key TEXT PRIMARY KEY,
+        value TEXT
+      );
       CREATE INDEX IF NOT EXISTS idx_tasks_projectId ON tasks(projectId);
       CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
     `);
@@ -105,7 +110,55 @@ export class ProjectBrain {
       return this.handleSeedSpecial();
     }
 
+    // POST /telegram/webhook
+    if (url.pathname === '/telegram/webhook' && method === 'POST') {
+      return this.handleTelegramWebhook(request);
+    }
+
     return new Response('Not Found', { status: 404 });
+  }
+
+  /**
+   * Handles Telegram Webhook updates.
+   */
+  private async handleTelegramWebhook(request: Request): Promise<Response> {
+    const token = (this.env as Env).TELEGRAM_BOT_TOKEN;
+    if (!token) return new Response('Missing Token', { status: 500 });
+
+    try {
+      const update = await request.json() as any;
+      if (update.message && update.message.text && update.message.chat) {
+        const chatId = String(update.message.chat.id);
+        const text = update.message.text;
+
+        if (text === '/start') {
+          // Save Chat ID
+          this.sql.exec("INSERT OR REPLACE INTO system_settings (key, value) VALUES ('telegram_chat_id', ?)", chatId);
+          await this.sendTelegramMessage(token, chatId, "✅ Subscribed! You will receive daily research reports here.");
+        }
+      }
+      return new Response('OK');
+    } catch (e) {
+      console.error('Telegram Webhook Error:', e);
+      return new Response('Error', { status: 500 });
+    }
+  }
+
+  private async sendTelegramMessage(token: string, chatId: string, text: string): Promise<void> {
+    const MAX_LENGTH = 4000; // Leave buffer for Telegram's 4096 limit
+    for (let i = 0; i < text.length; i += MAX_LENGTH) {
+      const chunk = text.slice(i, i + MAX_LENGTH);
+      // Try/catch per chunk to avoid failing entire loop if one fails
+      try {
+        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: chatId, text: chunk }) // Removed parse_mode 'Markdown' to avoid breaking on unescaped characters in raw output
+        });
+      } catch (e) {
+        console.error('Failed to send Telegram chunk:', e);
+      }
+    }
   }
 
   /**
@@ -150,7 +203,7 @@ export class ProjectBrain {
 
       // 1. Create/Update Project with DAILY schedule
       this.sql.exec(
-        `INSERT OR REPLACE INTO projects (id, name, scheduleInterval, lastRun, nextRun) 
+        `INSERT OR REPLACE INTO projects (id, name, scheduleInterval, lastRun, nextRun)
          VALUES (?, ?, 'daily', ?, ?)`,
         projectId, def.name, now, new Date(Date.now() + 86400000).toISOString()
       );
@@ -225,6 +278,7 @@ export class ProjectBrain {
    * @param taskIds - Optional list of specific task IDs to research. If provided, ignores the 'backlog' limit check for these.
    */
   private async performDeepResearch(apiKey: string, taskIds?: string[]): Promise<Response> {
+    const telegramToken = (this.env as Env).TELEGRAM_BOT_TOKEN;
     let candidates: CMSTask[] = [];
 
     if (taskIds && taskIds.length > 0) {
@@ -248,6 +302,10 @@ export class ProjectBrain {
     // The prompts are very different now. Better to run them individually or grouped by prompt type.
     // Deep Research Agent can handle multiple questions, but mixing "Rotary" and "Crypto" in one prompt might confuse it or hit output limits.
     // Let's run them individually for reliability in this "Advanced" mode.
+
+    // Get Chat ID
+    const chatIdRow = this.sql.exec("SELECT value FROM system_settings WHERE key = 'telegram_chat_id'").one() as { value: string } | null;
+    const chatId = chatIdRow?.value;
 
     for (const task of candidates) {
       const systemPrompt = getPromptForTask(task.title);
@@ -275,6 +333,13 @@ export class ProjectBrain {
           // Broadcast
           const updated = this.sql.exec("SELECT * FROM tasks WHERE id = ?", task.id).one() as unknown as CMSTask;
           if (updated) this.broadcast({ type: 'task_updated', task: updated });
+
+          // Telegram Notification (FULL OUTPUT)
+          if (telegramToken && chatId) {
+            const header = `📊 *Research Complete*\n**${task.title}**\n\n`;
+            // Send header then the full text
+            await this.sendTelegramMessage(telegramToken, chatId, header + result.text);
+          }
         }
       } catch (error) {
         console.error(`Research failed for task ${task.id}:`, error);
