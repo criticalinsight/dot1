@@ -1,5 +1,6 @@
 import { CMSTask, CMSProject } from '../../shared/types';
 import { DeepResearchClient } from './deepResearch';
+import { getPromptForTask } from './prompts';
 
 interface Env {
   GEMINI_API_KEY?: string;
@@ -99,6 +100,11 @@ export class ProjectBrain {
       return this.handleDailyCron();
     }
 
+    // POST /internal/seed-special
+    if (url.pathname === '/internal/seed-special' && method === 'POST') {
+      return this.handleSeedSpecial();
+    }
+
     return new Response('Not Found', { status: 404 });
   }
 
@@ -119,6 +125,53 @@ export class ProjectBrain {
       console.error('Daily Cron Failed:', e);
       return new Response('Internal Error', { status: 500 });
     }
+  }
+
+  /**
+   * Seeds special tasks requested by user and triggers research.
+   */
+  private async handleSeedSpecial(): Promise<Response> {
+    const tasks = [
+      "List of today's MoneyAcademyKE tweets ranked by number of views",
+      "List of Rotary Club meetings happening tomorrow within 30km radius of Nairobi",
+      "List of prediction market content today- strategies, social media posts, interviews, news $",
+      "List of wikipedia current events related to business, finance and economy topics. $",
+      "List of top crypto content today- strategies, trends, news (sort by importance) $",
+      "List of ai content- sentiment analysis $"
+    ];
+
+    const now = new Date().toISOString();
+    const createdIds: string[] = [];
+
+    for (const title of tasks) {
+      const id = crypto.randomUUID();
+      // Use a fixed 'seed-project' ID or just put them in a general bucket.
+      // For now using a placeholder project ID 'p-special'
+      const projectId = 'p-special';
+
+      // Ensure project exists so constraint doesn't fail
+      this.sql.exec("INSERT OR IGNORE INTO projects (id, name) VALUES (?, ?)", projectId, "Special Research");
+
+      this.sql.exec(
+        "INSERT INTO tasks (id, projectId, title, status, createdAt, updatedAt) VALUES (?, ?, ?, 'backlog', ?, ?)",
+        id, projectId, title, now, now
+      );
+
+      this.broadcast({
+        type: 'task_updated',
+        task: { id, projectId, title, status: 'backlog', createdAt: now, updatedAt: now }
+      });
+
+      createdIds.push(id);
+    }
+
+    // Trigger research immediately (background)
+    const apiKey = (this.env as Env).GEMINI_API_KEY;
+    if (apiKey) {
+      this.performDeepResearch(apiKey, createdIds); // Pass specific IDs to prioritize
+    }
+
+    return Response.json({ status: 'ok', tasks: createdIds });
   }
 
   /**
@@ -163,53 +216,64 @@ export class ProjectBrain {
   }
 
   /**
-   * Performs deep research on unresearched backlog tasks.
+   * Performs deep research on tasks.
+   * @param taskIds - Optional list of specific task IDs to research. If provided, ignores the 'backlog' limit check for these.
    */
-  private async performDeepResearch(apiKey: string): Promise<Response> {
-    // 1. Find candidates
-    const candidates = this.sql
-      .exec("SELECT * FROM tasks WHERE status = 'backlog' AND (researchData IS NULL OR researchData = '') LIMIT 5")
-      .toArray() as unknown as CMSTask[];
+  private async performDeepResearch(apiKey: string, taskIds?: string[]): Promise<Response> {
+    let candidates: CMSTask[] = [];
+
+    if (taskIds && taskIds.length > 0) {
+      // Fetch specific tasks requested
+      const placeholders = taskIds.map(() => '?').join(',');
+      candidates = this.sql.exec(`SELECT * FROM tasks WHERE id IN (${placeholders})`, ...taskIds).toArray() as unknown as CMSTask[];
+    } else {
+      // Default backlog fetch
+      candidates = this.sql
+        .exec("SELECT * FROM tasks WHERE status = 'backlog' AND (researchData IS NULL OR researchData = '') LIMIT 5")
+        .toArray() as unknown as CMSTask[];
+    }
 
     if (candidates.length === 0) {
       return Response.json({ status: 'ok', message: 'No tasks to research' });
     }
 
-    // 2. Construct Prompt
-    const titles = candidates.map(t => `- ${t.title} (ID: ${t.id})`).join('\n');
-    const prompt = `
-      You are a research assistant. Research these topics deeply:
-      ${titles}
-
-      For each, provide:
-      1. Summary of trends.
-      2. Key challenges.
-      3. 3+ Citations.
-
-      Output JSON: { "task-id": "Research text..." }
-    `;
-
-    // 3. Call Agent
     const client = new DeepResearchClient(apiKey);
-    const opName = await client.startResearch(prompt);
-    const result = await client.pollOperation(opName);
 
-    if (result && result.text) {
-      const jsonStr = result.text.replace(/```json/g, '').replace(/```/g, '').trim();
-      const researchMap = JSON.parse(jsonStr) as Record<string, string>;
+    // Process one by one or batch?
+    // The prompts are very different now. Better to run them individually or grouped by prompt type.
+    // Deep Research Agent can handle multiple questions, but mixing "Rotary" and "Crypto" in one prompt might confuse it or hit output limits.
+    // Let's run them individually for reliability in this "Advanced" mode.
 
-      for (const [id, data] of Object.entries(researchMap)) {
-        this.sql.exec(
-          "UPDATE tasks SET researchData = ?, updatedAt = ? WHERE id = ?",
-          data,
-          new Date().toISOString(),
-          id
-        );
+    for (const task of candidates) {
+      const systemPrompt = getPromptForTask(task.title);
+      const userMessage = `Task: ${task.title}`;
+      const fullPrompt = `${systemPrompt}\n\n${userMessage}`;
 
-        const updatedTask = this.sql.exec("SELECT * FROM tasks WHERE id = ?", id).one() as unknown as CMSTask;
-        if (updatedTask) {
-          this.broadcast({ type: 'task_updated', task: updatedTask });
+      try {
+        const opName = await client.startResearch(fullPrompt);
+
+        // Polling asynchronously - we don't await the result here to avoid blocking other tasks if we were serial.
+        // But since we're in a loop, we likely have to wait or spawn multiple promises.
+        // Cloudflare DO can handle multiple async operations.
+
+        // We'll wait for each to ensure we don't hit rate limits too hard.
+        const result = await client.pollOperation(opName);
+
+        if (result && result.text) {
+          this.sql.exec(
+            "UPDATE tasks SET researchData = ?, updatedAt = ? WHERE id = ?",
+            result.text,
+            new Date().toISOString(),
+            task.id
+          );
+
+          // Broadcast
+          const updated = this.sql.exec("SELECT * FROM tasks WHERE id = ?", task.id).one() as unknown as CMSTask;
+          if (updated) this.broadcast({ type: 'task_updated', task: updated });
         }
+      } catch (error) {
+        console.error(`Research failed for task ${task.id}:`, error);
+        // Continue to next task
       }
     }
 
