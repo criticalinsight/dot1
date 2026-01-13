@@ -31,6 +31,13 @@ const createPrinter = () => {
 
 /**
  * Phase 8: Off-main-thread processing.
+ * 
+ * Handles CPU-intensive command parsing, filtering, and sorting.
+ * 
+ * Complexity:
+ * - Parsing: O(C) where C is command length
+ * - Execution: Depends on command (e.g. 'ls' is O(N log N) for sort)
+ * - Overhead: Serialization cost O(N) for message passing (until SharedArrayBuffer)
  */
 self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     const { id, type, payload } = e.data;
