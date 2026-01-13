@@ -8,10 +8,12 @@
 
 - **Edge-Native**: Cloudflare Workers + Durable Objects
 - **Real-Time Sync**: WebSocket live updates
+- **Deep Research**: Automated multi-agent research (Epistemic/Strategic)
+- **Telegram Integration**: Research reports delivered to chat
 - **Ultra-Light**: **6KB** gzipped bundle
 - **CLI Interface**: Terminal-style browser app
 
-## Current State (v2.2)
+## Current State (v3.0)
 
 | Feature | Status |
 |---------|--------|
@@ -77,21 +79,21 @@
 | Compression (zstd) | -60% message size | Low |
 | Multiplexing | Single connection for all | High |
 
-### Phase 7: Rendering (Aug 2026)
+### Phase 7: Rendering (Active - v3.0) ✅
 | Enhancement | Impact | Effort |
 |-------------|--------|--------|
-| Virtual scrolling | O(1) render for 10k items | Medium |
-| requestIdleCallback | Non-blocking updates | Low |
-| Web Workers | Off-main-thread processing | Medium |
-| Canvas rendering | 60fps for large lists | High |
+| Virtual scrolling | O(1) render for 10k items | Done ✅ |
+| requestIdleCallback | Non-blocking updates | Done ✅ |
+| Web Workers | Off-main-thread processing | Done ✅ |
+| Canvas rendering | 60fps for large lists | Skipped |
 
-### Phase 8: Extreme (Sep 2026)
+### Phase 8: Extreme (Active - v3.0) ✅
 | Enhancement | Impact | Effort |
 |-------------|--------|--------|
-| WASM core logic | 10x parse speed | High |
-| SharedArrayBuffer | Zero-copy data transfer | High |
-| HTTP/3 0-RTT | -100ms cold start | Low |
-| Predictive prefetch | Anticipate user actions | Medium |
+| Web Worker CLI | 0ms UI blocking | Done ✅ |
+| SharedArrayBuffer | Zero-copy data transfer | Deferred |
+| COOP/COEP Headers | Security for High-Res timers | Done ✅ |
+| Predictive prefetch | Anticipate user actions | Planned |
 
 ---
 
@@ -116,7 +118,6 @@
 
 ## Non-Goals
 
-- AI features
 - Rich text editor
 - File uploads
 - Multi-tenant
