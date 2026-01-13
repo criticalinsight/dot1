@@ -1,0 +1,17 @@
+name = "velocity-backend"
+main = "src/index.ts"
+compatibility_date = "2024-04-01"
+
+[[durable_objects.bindings]]
+name = "PROJECT_BRAIN"
+class_name = "ProjectBrain"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["ProjectBrain"]
+
+[observability]
+enabled = true
+
+# SQLite persistence for Durable Objects
+# Note: This requires the DO class to implement the 'storage' API with SQL support.
