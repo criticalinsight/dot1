@@ -1,4 +1,4 @@
-import { CMSTask } from '../../shared/types';
+import { CMSTask, CMSProject } from '../../shared/types';
 import { DeepResearchClient } from './deepResearch';
 
 interface Env {
@@ -70,18 +70,6 @@ export class ProjectBrain {
 
   /**
    * Request handler for the Durable Object.
-   *
-   * Routes:
-   * - GET /sync: Returns all projects and tasks
-   * - POST /sync: Bulk upserts projects
-   * - POST /task: Single task upsert
-   * - WebSocket upgrade: Real-time sync
-   *
-   * @param request - Incoming HTTP request
-   * @returns HTTP response
-   */
-  /**
-   * Request handler for the Durable Object.
    */
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
@@ -106,27 +94,79 @@ export class ProjectBrain {
       return this.handleTaskPost(request);
     }
 
-    // POST /internal/cron/deep-research
-    if (url.pathname === '/internal/cron/deep-research' && method === 'POST') {
-      return this.handleCronDeepResearch();
+    // POST /internal/cron/daily
+    if (url.pathname === '/internal/cron/daily' && method === 'POST') {
+      return this.handleDailyCron();
     }
 
     return new Response('Not Found', { status: 404 });
   }
 
   /**
-   * Handles daily deep research cron job.
-   * Finds backlog tasks without research data and processes them.
+   * Handles daily cron: Generates recurring tasks, then researches backlog.
    */
-  private async handleCronDeepResearch(): Promise<Response> {
+  private async handleDailyCron(): Promise<Response> {
     const apiKey = (this.env as Env).GEMINI_API_KEY;
-    if (!apiKey) {
-      console.error('GEMINI_API_KEY not configured');
-      return new Response('Missing API Key', { status: 500 });
-    }
+    if (!apiKey) return new Response('Missing API Key', { status: 500 });
 
-    // 1. Find candidates: backlog tasks with no research data
-    // Limit to 5 per run to avoid blowing timeouts/quotas
+    try {
+      // 1. Generate recurring tasks
+      await this.generateRecurringTasks();
+
+      // 2. Perform Deep Research on backlog
+      return this.performDeepResearch(apiKey);
+    } catch (e) {
+      console.error('Daily Cron Failed:', e);
+      return new Response('Internal Error', { status: 500 });
+    }
+  }
+
+  /**
+   * Generates new tasks for projects with active schedules.
+   */
+  private async generateRecurringTasks(): Promise<void> {
+    const now = new Date();
+    // Select projects due for run
+    const dueProjects = this.sql
+      .exec("SELECT * FROM projects WHERE scheduleInterval = 'daily' AND (nextRun IS NULL OR nextRun <= ?)", now.toISOString())
+      .toArray() as unknown as CMSProject[];
+
+    for (const proj of dueProjects) {
+      const taskId = crypto.randomUUID();
+      const dateStr = now.toISOString().split('T')[0];
+      const title = `${proj.name} - ${dateStr}`;
+
+      // Create new task in backlog
+      this.sql.exec(
+        "INSERT INTO tasks (id, projectId, title, status, createdAt, updatedAt) VALUES (?, ?, ?, 'backlog', ?, ?)",
+        taskId,
+        proj.id,
+        title,
+        now.toISOString(),
+        now.toISOString()
+      );
+
+      // Update Project next run time (24h later)
+      const nextRun = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+      this.sql.exec(
+        "UPDATE projects SET lastRun = ?, nextRun = ? WHERE id = ?",
+        now.toISOString(),
+        nextRun,
+        proj.id
+      );
+
+      this.broadcast({
+        type: 'task_updated',
+        task: { id: taskId, projectId: proj.id, title, status: 'backlog', createdAt: now.toISOString(), updatedAt: now.toISOString() }
+      });
+    }
+  }
+
+  /**
+   * Performs deep research on unresearched backlog tasks.
+   */
+  private async performDeepResearch(apiKey: string): Promise<Response> {
+    // 1. Find candidates
     const candidates = this.sql
       .exec("SELECT * FROM tasks WHERE status = 'backlog' AND (researchData IS NULL OR researchData = '') LIMIT 5")
       .toArray() as unknown as CMSTask[];
@@ -135,52 +175,42 @@ export class ProjectBrain {
       return Response.json({ status: 'ok', message: 'No tasks to research' });
     }
 
-    // 2. Construct Batch Prompt
+    // 2. Construct Prompt
     const titles = candidates.map(t => `- ${t.title} (ID: ${t.id})`).join('\n');
     const prompt = `
-      You are a research assistant for a content management system.
-      Please research the following topics deeply:
+      You are a research assistant. Research these topics deeply:
       ${titles}
 
-      For each topic, provide:
-      1. A summary of the current state/trends.
-      2. Key challenges or controversies.
-      3. At least 3 credible sources/citations.
+      For each, provide:
+      1. Summary of trends.
+      2. Key challenges.
+      3. 3+ Citations.
 
-      Format the output as a JSON object where keys are the Task IDs and values are the research text.
-      Example: { "task-id-1": "Research text...", "task-id-2": "..." }
+      Output JSON: { "task-id": "Research text..." }
     `;
 
     // 3. Call Agent
     const client = new DeepResearchClient(apiKey);
-    try {
-      const opName = await client.startResearch(prompt);
-      const result = await client.pollOperation(opName);
+    const opName = await client.startResearch(prompt);
+    const result = await client.pollOperation(opName);
 
-      if (result && result.text) {
-        // 4. Parse and Update
-        // The agent might return markdown JSON blocks, need to clean
-        const jsonStr = result.text.replace(/```json/g, '').replace(/```/g, '').trim();
-        const researchMap = JSON.parse(jsonStr) as Record<string, string>;
+    if (result && result.text) {
+      const jsonStr = result.text.replace(/```json/g, '').replace(/```/g, '').trim();
+      const researchMap = JSON.parse(jsonStr) as Record<string, string>;
 
-        for (const [id, data] of Object.entries(researchMap)) {
-          this.sql.exec(
-            "UPDATE tasks SET researchData = ?, updatedAt = ? WHERE id = ?",
-            data,
-            new Date().toISOString(),
-            id
-          );
+      for (const [id, data] of Object.entries(researchMap)) {
+        this.sql.exec(
+          "UPDATE tasks SET researchData = ?, updatedAt = ? WHERE id = ?",
+          data,
+          new Date().toISOString(),
+          id
+        );
 
-          // Broadcast update
-          const updatedTask = this.sql.exec("SELECT * FROM tasks WHERE id = ?", id).one() as unknown as CMSTask;
-          if (updatedTask) {
-            this.broadcast({ type: 'task_updated', task: updatedTask });
-          }
+        const updatedTask = this.sql.exec("SELECT * FROM tasks WHERE id = ?", id).one() as unknown as CMSTask;
+        if (updatedTask) {
+          this.broadcast({ type: 'task_updated', task: updatedTask });
         }
       }
-    } catch (e) {
-      console.error('Deep Research Failed:', e);
-      return new Response('Agent Execution Failed', { status: 500 });
     }
 
     return Response.json({ status: 'ok', processed: candidates.length });
@@ -295,6 +325,7 @@ export class ProjectBrain {
 
     return Response.json({ status: 'ok' });
   }
+
   /**
    * Broadcasts a message to all connected WebSocket clients.
    */

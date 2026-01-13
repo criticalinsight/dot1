@@ -52,9 +52,9 @@ export default {
 		const id = env.PROJECT_BRAIN.idFromName('global');
 		const stub = env.PROJECT_BRAIN.get(id);
 
-		// Fire-and-forget internal request to trigger deep research
+		// Fire-and-forget internal request to trigger daily cron (recurring tasks + research)
 		ctx.waitUntil(
-			stub.fetch('http://internal/cron/deep-research', {
+			stub.fetch('http://internal/cron/daily', {
 				method: 'POST',
 			})
 		);
