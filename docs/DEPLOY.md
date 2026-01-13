@@ -6,6 +6,7 @@
 |---------|-----|
 | Frontend | https://dot1-e8r.pages.dev |
 | Backend | https://dot1-backend.iamkingori.workers.dev |
+| Custom Route | moecapital.com/1/* -> dot1-backend |
 
 - Node.js 20+
 - Cloudflare account with Workers paid plan (for Durable Objects)
