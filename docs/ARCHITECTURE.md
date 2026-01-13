@@ -24,17 +24,16 @@ Velocity uses a **local-first** architecture with **edge synchronization**.
 ### Frontend
 | Component | Purpose |
 |-----------|---------|
-| `App.tsx` | Root, project loader |
-| `KanbanBoard` | Renders 5 status columns |
-| `KanbanColumn` | Single status column |
-| `KanbanCard` | Individual task card |
-| `db/client.ts` | PGlite + sync logic |
+| `App.tsx` | UI Shell & State Management |
+| `commands.ts` | CLI Command Logic (ls, add, mv) |
+| `db/store.ts` | State Store, Sync, & Caching |
+| `KanbanBoard` | Renders columns & tasks |
 
 ### Backend
 | Component | Purpose |
 |-----------|---------|
-| `index.ts` | Worker entry, routes to DO |
-| `ProjectBrain.ts` | Durable Object, SQLite CRUD |
+| `index.ts` | Worker Entry Point |
+| `ProjectBrain.ts` | Durable Object (Split Route Handlers) |
 
 ## Database Schema
 

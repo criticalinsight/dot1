@@ -6,9 +6,18 @@ Base URL: `https://backend.iamkingori.workers.dev`
 
 ### GET /sync
 
-Fetch all projects and tasks.
+Fetch all projects and tasks. Supports Delta Sync and Conditional GET.
+
+**Query Parameters**
+- `since` (optional): ISO8601 timestamp. Returns only items updated after this time.
+
+**Headers**
+- `If-None-Match` (optional): ETag from previous response.
 
 **Response**
+- `200 OK`: Full or delta JSON body.
+- `304 Not Modified`: No changes (body empty).
+
 ```json
 {
   "projects": [

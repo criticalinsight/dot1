@@ -3,6 +3,17 @@
 ## [2.1.0] - 2026-01-13
 
 ### Added
+- **Phase 5 (Network)**: ETag support (304 Not Modified) for `/sync`
+- **Phase 6 (Protocol)**: Delta Sync (fetching only changed items via `?since=`)
+- Refactoring: Extracted `commands.ts` for CLI logic in frontend
+- Refactoring: Split `ProjectBrain.ts` into discrete route handlers
+
+### Optimizations
+- **Network**: Reduced payload size by ~90% for subsequent syncs
+- **Code Quality**: Separated concerns in Backend (routes) and Frontend (commands)
+- **Performance**: Validated caching headers and weak ETag generation
+
+### Added (Previous)
 - Speed optimizations: indexes, memoization, batched transactions
 - JSDoc with Big O complexity analysis on all functions
 - Input validation with length limits and type checks
