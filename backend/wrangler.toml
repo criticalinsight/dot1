@@ -8,7 +8,7 @@ class_name = "ProjectBrain"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["ProjectBrain"]
+new_sqlite_classes = ["ProjectBrain"]
 
 [observability]
 enabled = true
