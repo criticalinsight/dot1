@@ -32,8 +32,11 @@ Velocity uses a **local-first** architecture with **edge synchronization**.
 ### Backend
 | Component | Purpose |
 |-----------|---------|
-| `index.ts` | Worker Entry Point |
-| `ProjectBrain.ts` | Durable Object (Split Route Handlers) |
+| `index.ts` | Worker Entry Point (WebSocket Fix) |
+| `ProjectBrain.ts` | Durable Object (State, Cron, Telegram) |
+| `prompts.ts` | Research Prompt Templates (Epistemic, Rotary, etc) |
+| `deepResearch.ts` | Gemini Agent Client |
+| `proxy/` | Subpath Routing Worker |
 
 ## Database Schema
 
@@ -42,9 +45,11 @@ Velocity uses a **local-first** architecture with **edge synchronization**.
 CREATE TABLE projects(
   id TEXT PRIMARY KEY,
   name TEXT,
-  globalPrompt TEXT,
-  knowledgeContext TEXT,
-  scheduleInterval TEXT
+  globalPrompt TEXT, // Not used currently
+  knowledgeContext TEXT, // Not used currently
+  scheduleInterval TEXT, // 'daily'
+  lastRun TEXT,
+  nextRun TEXT
 );
 
 -- Tasks
@@ -53,11 +58,17 @@ CREATE TABLE tasks(
   projectId TEXT,
   title TEXT,
   status TEXT,  -- backlog|researching|drafting|review|published
-  researchData TEXT,
+  researchData TEXT, // JSON or Markdown report
   contentDraft TEXT,
   publishedUrl TEXT,
   createdAt TEXT,
   updatedAt TEXT
+);
+
+-- Settings
+CREATE TABLE system_settings(
+  key TEXT PRIMARY KEY, // e.g., 'telegram_chat_id'
+  value TEXT
 );
 ```
 

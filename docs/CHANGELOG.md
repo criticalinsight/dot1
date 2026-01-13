@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.2.0] - 2026-01-13
+
+### Added
+- **Deep Research Agent**: Integrated Gemini for automated research with advanced prompts (Epistemic/Strategic).
+- **Recurring Schedule**: Projects with `scheduleInterval='daily'` auto-generate tasks via cron.
+- **Telegram Integration**: Full research reports sent to Telegram bot (`/telegram/webhook`).
+- **Subpath Deployment**: Frontend ported to `/1/` base path for `moecapital.com/1`.
+- **Proxy Worker**: Cloudflare Worker to route `moecapital.com/1/*` to key frontend.
+
+### Fixed
+- **WebSocket RangeError**: Fixed status 101 handling in Worker entry point.
+- **Deployment**: Resolved subpath asset loading issues.
+
+---
+
 ## [2.1.0] - 2026-01-13
 
 ### Added
