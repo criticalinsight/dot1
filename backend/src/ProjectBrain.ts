@@ -128,50 +128,55 @@ export class ProjectBrain {
   }
 
   /**
-   * Seeds special tasks requested by user and triggers research.
+   * Seeds special tasks as RECURRING DAILY PROJECTS.
    */
   private async handleSeedSpecial(): Promise<Response> {
-    const tasks = [
-      "List of today's MoneyAcademyKE tweets ranked by number of views",
-      "List of Rotary Club meetings happening tomorrow within 30km radius of Nairobi",
-      "List of prediction market content today- strategies, social media posts, interviews, news $",
-      "List of wikipedia current events related to business, finance and economy topics. $",
-      "List of top crypto content today- strategies, trends, news (sort by importance) $",
-      "List of ai content- sentiment analysis $"
+    const definitions = [
+      { name: "MoneyAcademy Analysis", title: "List of today's MoneyAcademyKE tweets ranked by number of views" },
+      { name: "Rotary Club Scanner", title: "List of Rotary Club meetings happening tomorrow within 30km radius of Nairobi" },
+      { name: "Prediction Markets Report", title: "List of prediction market content today- strategies, social media posts, interviews, news $" },
+      { name: "Global Business Events", title: "List of wikipedia current events related to business, finance and economy topics. $" },
+      { name: "Crypto Trends Analysis", title: "List of top crypto content today- strategies, trends, news (sort by importance) $" },
+      { name: "AI Sentiment Daily", title: "List of ai content- sentiment analysis $" }
     ];
 
     const now = new Date().toISOString();
     const createdIds: string[] = [];
 
-    for (const title of tasks) {
-      const id = crypto.randomUUID();
-      // Use a fixed 'seed-project' ID or just put them in a general bucket.
-      // For now using a placeholder project ID 'p-special'
-      const projectId = 'p-special';
+    for (const def of definitions) {
+      // Deterministic ID based on name to prevent duplicates if seeded multiple times
+      // Simple hash-like ID (not crypto secure but fine for this DB keyspace)
+      const projectId = 'proj-' + def.name.replace(/\s+/g, '-').toLowerCase();
 
-      // Ensure project exists so constraint doesn't fail
-      this.sql.exec("INSERT OR IGNORE INTO projects (id, name) VALUES (?, ?)", projectId, "Special Research");
+      // 1. Create/Update Project with DAILY schedule
+      this.sql.exec(
+        `INSERT OR REPLACE INTO projects (id, name, scheduleInterval, lastRun, nextRun) 
+         VALUES (?, ?, 'daily', ?, ?)`,
+        projectId, def.name, now, new Date(Date.now() + 86400000).toISOString()
+      );
 
+      // 2. Create TODAY's task immediately (so user doesn't wait 24h)
+      const taskId = crypto.randomUUID();
       this.sql.exec(
         "INSERT INTO tasks (id, projectId, title, status, createdAt, updatedAt) VALUES (?, ?, ?, 'backlog', ?, ?)",
-        id, projectId, title, now, now
+        taskId, projectId, def.title, now, now
       );
 
       this.broadcast({
         type: 'task_updated',
-        task: { id, projectId, title, status: 'backlog', createdAt: now, updatedAt: now }
+        task: { id: taskId, projectId, title: def.title, status: 'backlog', createdAt: now, updatedAt: now }
       });
 
-      createdIds.push(id);
+      createdIds.push(taskId);
     }
 
-    // Trigger research immediately (background)
+    // Trigger research immediately for these new tasks
     const apiKey = (this.env as Env).GEMINI_API_KEY;
     if (apiKey) {
-      this.performDeepResearch(apiKey, createdIds); // Pass specific IDs to prioritize
+      this.performDeepResearch(apiKey, createdIds);
     }
 
-    return Response.json({ status: 'ok', tasks: createdIds });
+    return Response.json({ status: 'ok', tasks: createdIds, message: "Projects set to daily" });
   }
 
   /**

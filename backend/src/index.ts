@@ -31,6 +31,13 @@ export default {
 		// Forward to Durable Object
 		const id = env.PROJECT_BRAIN.idFromName('global');
 		const stub = env.PROJECT_BRAIN.get(id);
+
+		// FIX: For WebSockets, return the DO response immediately.
+		// Wrapping it in new Response() throws RangeError for status 101.
+		if (request.headers.get('Upgrade') === 'websocket') {
+			return stub.fetch(request);
+		}
+
 		const response = await stub.fetch(request);
 
 		// Add speed headers to response
