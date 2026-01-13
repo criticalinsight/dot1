@@ -1,0 +1,8 @@
+name = "moecapital-dot1-proxy"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+# This route intercepts traffic on the user's domain and handles it with this worker
+[[routes]]
+pattern = "moecapital.com/1/*"
+zone_name = "moecapital.com"
