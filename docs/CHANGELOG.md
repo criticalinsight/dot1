@@ -3,6 +3,8 @@
 ## [2.2.0] - 2026-01-13
 
 ### Added
+- **Phase 7 (Rendering)**: Virtual terminal scrolling for 10k+ lines, `requestIdleCallback` for non-critical sync.
+- **Phase 8 (Extreme)**: Off-main-thread CLI command processing (Web Worker), COOP/COEP security headers.
 - **Deep Research Agent**: Integrated Gemini for automated research with advanced prompts (Epistemic/Strategic).
 - **Recurring Schedule**: Projects with `scheduleInterval='daily'` auto-generate tasks via cron.
 - **Telegram Integration**: Full research reports sent to Telegram bot (`/telegram/webhook`).

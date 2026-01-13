@@ -44,6 +44,9 @@ export default {
 		const headers = new Headers(response.headers);
 		headers.set('Access-Control-Allow-Origin', '*');
 		headers.set('Vary', 'Accept-Encoding');
+		// Phase 8: Required for SharedArrayBuffer / High-Res Timers
+		headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+		headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
 
 		return new Response(response.body, {
 			status: response.status,
