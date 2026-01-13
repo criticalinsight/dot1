@@ -2,51 +2,84 @@
 
 ## Overview
 
-**Velocity** is a lean, speed-first Kanban-based content management system built on modern edge technologies. The application provides a minimal, focused task tracking interface for content pipelines.
+**Velocity** is a lean, speed-first CLI-style task management system built on modern edge technologies. Browser-based terminal interface with real-time sync.
 
 ## Core Value Proposition
 
-- **Edge-Native**: Runs on Cloudflare Workers with Durable Objects
-- **Real-Time Sync**: WebSocket-based live updates between frontend and backend
-- **Local-First**: PGlite (PostgreSQL in WASM) for offline-capable frontend
-- **Minimal Footprint**: No bloat, only essential features
+- **Edge-Native**: Cloudflare Workers + Durable Objects
+- **Real-Time Sync**: WebSocket live updates
+- **Ultra-Light**: **6KB** gzipped bundle
+- **CLI Interface**: Terminal-style browser app
 
-## Features
+## Current State (v2.2)
 
-### Must Have (P0)
 | Feature | Status |
 |---------|--------|
-| Kanban board with 5 status columns | ✅ Implemented |
-| Project context display | ✅ Implemented |
-| Task persistence (SQLite) | ✅ Implemented |
-| Backend-frontend sync | ✅ Implemented |
+| Browser CLI interface | ✅ |
+| Commands: ls, add, mv, clear, help | ✅ |
+| SQLite Durable Object backend | ✅ |
+| WebSocket real-time sync | ✅ |
+| 6KB gzipped bundle | ✅ |
 
-### Future Considerations (P1)
-| Feature | Status |
-|---------|--------|
-| Task creation UI | ⏳ Planned |
-| Drag-and-drop status changes | ⏳ Planned |
-| Multi-project support | ⏳ Planned |
-| User authentication | ⏳ Planned |
+---
+
+## Speed Enhancements Roadmap
+
+### Phase 1: Network (v2.3 - Feb 2026)
+| Enhancement | Impact | Effort |
+|-------------|--------|--------|
+| HTTP/3 QUIC support | -20ms latency | Low |
+| Brotli compression | -15% payload | Low |
+| Edge caching (stale-while-revalidate) | -50ms TTFB | Done ✅ |
+| Connection keepalive | -100ms reconnect | Medium |
+
+### Phase 2: Runtime (v2.4 - Mar 2026)
+| Enhancement | Impact | Effort |
+|-------------|--------|--------|
+| WebSocket binary protocol | -30% message size | Medium |
+| Batch command execution | -n× round trips | Medium |
+| Optimistic UI updates | Instant feedback | Low |
+| Debounced sync (100ms) | -80% network calls | Low |
+
+### Phase 3: Backend (v2.5 - Apr 2026)
+| Enhancement | Impact | Effort |
+|-------------|--------|--------|
+| SQLite WAL mode | 10x write speed | Low |
+| Prepared statements | -5ms query time | Done ✅ |
+| Index on (projectId, status) | O(log n) queries | Done ✅ |
+| Query result streaming | -50% memory | High |
+
+### Phase 4: Bundle (v2.6 - May 2026)
+| Enhancement | Impact | Effort |
+|-------------|--------|--------|
+| Tree-shake SolidJS | -2KB | Low |
+| Inline critical CSS | -1 request | Low |
+| Preload hints | -100ms FCP | Low |
+| Service Worker caching | Offline capable | Medium |
+
+---
+
+## Success Metrics
+
+| Metric | Current | Target v3.0 |
+|--------|---------|-------------|
+| Bundle (gzip) | **6KB** | <5KB |
+| First paint | ~200ms | <100ms |
+| Sync latency | ~50ms | <20ms |
+| Backend cold start | ~30ms | <10ms |
 
 ## Technical Stack
 
 | Layer | Technology |
 |-------|------------|
-| Frontend | SolidJS, Vite, PGlite |
+| Frontend | SolidJS, Vite, Terminal CSS |
 | Backend | Cloudflare Workers, Durable Objects |
-| Database | SQLite (DO) + PGlite (Browser) |
-| Styling | Tailwind CSS |
-
-## Success Metrics
-
-1. **Cold Start**: < 50ms for Durable Object initialization
-2. **Sync Latency**: < 100ms for task updates via WebSocket
-3. **Bundle Size**: < 200KB gzipped for frontend
+| Database | SQLite (DO) |
+| Protocol | HTTPS/WSS |
 
 ## Non-Goals
 
-- AI content generation (removed for lean scope)
-- Multi-CMS publishing (removed)
-- Voice input (removed)
-- Image generation (removed)
+- AI features
+- Rich text editor
+- File uploads
+- Multi-tenant

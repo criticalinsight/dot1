@@ -1,5 +1,134 @@
-@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+:root {
+  --bg: #0d0d0d;
+  --fg: #00ff41;
+  --dim: #006b1d;
+  --cyan: #00d4ff;
+  --yellow: #ffd700;
+  --red: #ff4444;
+  --border: #1a3a1a;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
 body {
-  @apply bg-slate-950 text-slate-200;
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* CRT effect */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg,
+      rgba(0, 0, 0, 0.15) 0px,
+      rgba(0, 0, 0, 0.15) 1px,
+      transparent 1px,
+      transparent 2px);
+  z-index: 9999;
+}
+
+#root {
+  text-shadow: 0 0 1px var(--fg);
+}
+
+.terminal {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.terminal-header {
+  background: var(--border);
+  border-bottom: 1px solid var(--fg);
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.terminal-title {
+  color: var(--cyan);
+}
+
+.terminal-status {
+  color: var(--dim);
+}
+
+.terminal-body {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  max-height: calc(100vh - 40px);
+}
+
+.line {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.line-command {
+  color: var(--cyan);
+}
+
+.line-output {
+  color: var(--fg);
+}
+
+.line-error {
+  color: var(--red);
+}
+
+.line-success {
+  color: var(--yellow);
+}
+
+.input-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.prompt {
+  color: var(--yellow);
+  font-weight: bold;
+}
+
+.input-line input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--fg);
+  font-family: inherit;
+  font-size: inherit;
+  caret-color: var(--fg);
+}
+
+.input-line input::placeholder {
+  color: var(--dim);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--dim);
 }
