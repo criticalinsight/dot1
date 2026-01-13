@@ -21,6 +21,9 @@
 | Commands: ls, add, mv, clear, help | ✅ |
 | SQLite Durable Object backend | ✅ |
 | WebSocket real-time sync | ✅ |
+| Deep Research Agent (Daily Task) | ✅ |
+| Telegram Reports | ✅ |
+| Virtual Scrolling (10k+ lines) | ✅ |
 | 6KB gzipped bundle | ✅ |
 
 ---
