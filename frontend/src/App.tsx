@@ -1,19 +1,15 @@
 import type { Component } from 'solid-js';
 import { createSignal, onMount, For, createEffect, onCleanup } from 'solid-js';
 import type { CMSProject, CMSTask } from '../../shared/types';
-import { sync, getTasks, upsertTask, subscribe } from './db/store';
+import { sync, getTasks, subscribe } from './db/store';
+import { executeCommand } from './commands';
 
 interface OutputLine {
   type: 'command' | 'output' | 'error' | 'success';
   text: string;
 }
 
-const HELP = `Commands:
-  ls              List all tasks
-  add <title>     Create task
-  mv <id> <status> Move task (backlog|researching|drafting|review|published)
-  clear           Clear screen
-  help            Show help`;
+
 
 /**
  * CLI App with command history and keyboard navigation.
@@ -46,73 +42,12 @@ const App: Component = () => {
   };
 
   const handleCommand = async (cmd: string) => {
-    print(`$ ${cmd}`, 'command');
-    const parts = cmd.trim().split(/\s+/);
-    const command = parts[0]?.toLowerCase();
-
-    switch (command) {
-      case 'ls':
-      case 'list': {
-        const t = tasks();
-        if (t.length === 0) {
-          print('No tasks.', 'output');
-        } else {
-          print('ID       STATUS       TITLE', 'output');
-          t.forEach((task) => {
-            print(`${task.id.slice(0, 8)} ${task.status.padEnd(12)} ${task.title}`, 'output');
-          });
-        }
-        break;
-      }
-
-      case 'add':
-      case 'new': {
-        const title = parts.slice(1).join(' ');
-        if (!title) { print('Usage: add <title>', 'error'); break; }
-        const proj = project();
-        if (!proj) { print('No project.', 'error'); break; }
-        const newTask: CMSTask = {
-          id: crypto.randomUUID(),
-          projectId: proj.id,
-          title,
-          status: 'backlog',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        await upsertTask(newTask);
-        print(`Created: ${newTask.id.slice(0, 8)}`, 'success');
-        break;
-      }
-
-      case 'mv':
-      case 'move': {
-        const [, idPrefix, newStatus] = parts;
-        if (!idPrefix || !newStatus) { print('Usage: mv <id> <status>', 'error'); break; }
-        const valid = ['backlog', 'researching', 'drafting', 'review', 'published'];
-        if (!valid.includes(newStatus)) { print(`Status: ${valid.join('|')}`, 'error'); break; }
-        const task = tasks().find((t) => t.id.startsWith(idPrefix));
-        if (!task) { print(`Not found: ${idPrefix}`, 'error'); break; }
-        await upsertTask({ ...task, status: newStatus as CMSTask['status'], updatedAt: new Date().toISOString() });
-        print(`${idPrefix} → ${newStatus}`, 'success');
-        break;
-      }
-
-      case 'clear':
-      case 'cls':
-        setOutput([]);
-        break;
-
-      case 'help':
-      case '?':
-        HELP.split('\n').forEach((l) => print(l));
-        break;
-
-      case '':
-        break;
-
-      default:
-        print(`Unknown: ${command}. Type 'help'`, 'error');
-    }
+    await executeCommand(cmd, {
+      print,
+      project: project(),
+      tasks: tasks(),
+      clearOutput: () => setOutput([]),
+    });
   };
 
   const handleSubmit = async (e: Event) => {

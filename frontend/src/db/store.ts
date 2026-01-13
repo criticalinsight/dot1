@@ -45,22 +45,71 @@ function notify(): void {
  *
  * Time Complexity: O(1) network + O(n) cache update
  */
+let lastSyncTime: string | null = null;
+let currentETag: string | null = null;
+
+/**
+ * Fetches data with Delta Sync and ETag support.
+ *
+ * Time Complexity: O(delta) network + O(delta) cache update
+ */
 export async function sync(): Promise<{ projects: CMSProject[]; tasks: CMSTask[] }> {
     try {
-        const res = await fetch(`${BACKEND_URL}/sync`, {
-            headers: { Accept: 'application/json' },
-        });
+        const url = new URL(`${BACKEND_URL}/sync`);
+        if (lastSyncTime) url.searchParams.set('since', lastSyncTime);
+
+        const headers: HeadersInit = { Accept: 'application/json' };
+        if (currentETag) headers['If-None-Match'] = currentETag;
+
+        const res = await fetch(url.toString(), { headers });
+
+        // 304 Not Modified - No changes since last sync
+        if (res.status === 304) return { projects, tasks };
+
         if (!res.ok) throw new Error('Sync failed');
 
         const data = await res.json();
-        projects = data.projects || [];
-        tasks = data.tasks || [];
+
+        // Update cursors
+        currentETag = res.headers.get('ETag');
+        const now = new Date().toISOString();
+
+        mergeDelta(data);
+
+        // Fallback cursor if no tasks returned but successful sync
+        if (!lastSyncTime) lastSyncTime = now;
 
         connectWebSocket();
         notify();
         return { projects, tasks };
     } catch {
         return { projects, tasks };
+    }
+}
+
+/**
+ * Merges delta updates into the local cache.
+ * 
+ * @param data - The delta data from the backend
+ */
+function mergeDelta(data: { projects?: CMSProject[]; tasks?: CMSTask[] }) {
+    if (data.projects) {
+        data.projects.forEach((p) => {
+            const idx = projects.findIndex(curr => curr.id === p.id);
+            if (idx >= 0) projects[idx] = p;
+            else projects.push(p);
+        });
+    }
+
+    if (data.tasks) {
+        data.tasks.forEach((t) => {
+            const idx = tasks.findIndex(curr => curr.id === t.id);
+            if (idx >= 0) tasks[idx] = t;
+            else tasks.push(t);
+
+            // Track max updated time for next sync cursor
+            if (t.updatedAt > (lastSyncTime || '')) lastSyncTime = t.updatedAt;
+        });
     }
 }
 

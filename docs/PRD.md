@@ -49,24 +49,61 @@
 | Index on (projectId, status) | O(log n) queries | Done ✅ |
 | Query result streaming | -50% memory | High |
 
-### Phase 4: Bundle (v2.6 - May 2026)
+### Phase 4: Bundle (v2.6 - May 2026) ✅
 | Enhancement | Impact | Effort |
 |-------------|--------|--------|
 | Tree-shake SolidJS | -2KB | Low |
-| Inline critical CSS | -1 request | Low |
-| Preload hints | -100ms FCP | Low |
+| Inline critical CSS | -1 request | Done ✅ |
+| Preload hints | -100ms FCP | Done ✅ |
 | Service Worker caching | Offline capable | Medium |
+
+---
+
+## Advanced Speed Optimizations (v3.0+)
+
+### Phase 5: Edge Computing (Jun 2026)
+| Enhancement | Impact | Effort |
+|-------------|--------|--------|
+| Smart Caching | Cache per-user at edge | Medium |
+| Edge KV for session | -50ms auth lookup | Low |
+| Geographic routing | -30ms for distant users | Low |
+| Request coalescing | -n× concurrent requests | Medium |
+
+### Phase 6: Protocol (Jul 2026)
+| Enhancement | Impact | Effort |
+|-------------|--------|--------|
+| MessagePack over WS | -40% payload vs JSON | Medium |
+| Delta sync | Only send changed fields | High |
+| Compression (zstd) | -60% message size | Low |
+| Multiplexing | Single connection for all | High |
+
+### Phase 7: Rendering (Aug 2026)
+| Enhancement | Impact | Effort |
+|-------------|--------|--------|
+| Virtual scrolling | O(1) render for 10k items | Medium |
+| requestIdleCallback | Non-blocking updates | Low |
+| Web Workers | Off-main-thread processing | Medium |
+| Canvas rendering | 60fps for large lists | High |
+
+### Phase 8: Extreme (Sep 2026)
+| Enhancement | Impact | Effort |
+|-------------|--------|--------|
+| WASM core logic | 10x parse speed | High |
+| SharedArrayBuffer | Zero-copy data transfer | High |
+| HTTP/3 0-RTT | -100ms cold start | Low |
+| Predictive prefetch | Anticipate user actions | Medium |
 
 ---
 
 ## Success Metrics
 
-| Metric | Current | Target v3.0 |
-|--------|---------|-------------|
-| Bundle (gzip) | **6KB** | <5KB |
-| First paint | ~200ms | <100ms |
-| Sync latency | ~50ms | <20ms |
-| Backend cold start | ~30ms | <10ms |
+| Metric | Current | Target v3.0 | Target v4.0 |
+|--------|---------|-------------|-------------|
+| Bundle (gzip) | **6KB** | <5KB | <3KB |
+| First paint | ~200ms | <100ms | <50ms |
+| Sync latency | ~50ms | <20ms | <10ms |
+| Backend cold start | ~30ms | <10ms | <5ms |
+| Offline capable | ❌ | ⏳ | ✅ |
 
 ## Technical Stack
 
@@ -75,7 +112,7 @@
 | Frontend | SolidJS, Vite, Terminal CSS |
 | Backend | Cloudflare Workers, Durable Objects |
 | Database | SQLite (DO) |
-| Protocol | HTTPS/WSS |
+| Protocol | HTTPS/WSS, MessagePack |
 
 ## Non-Goals
 
@@ -83,3 +120,4 @@
 - Rich text editor
 - File uploads
 - Multi-tenant
+
