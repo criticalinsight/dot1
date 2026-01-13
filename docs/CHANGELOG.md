@@ -2,6 +2,10 @@
 
 ## [2.2.0] - 2026-01-13
 
+### Fixed
+- **Proxy Routing**: Updated `moecapital-dot1-proxy` to strip `/1` prefix before forwarding to Pages, resolving 404/MIME type errors.
+- **Frontend Build**: Fixed TypeScript errors in `VirtualList` and `cli.worker`.
+
 ### Added
 - **Phase 7 (Rendering)**: Virtual terminal scrolling for 10k+ lines, `requestIdleCallback` for non-critical sync.
 - **Phase 8 (Extreme)**: Off-main-thread CLI command processing (Web Worker), COOP/COEP security headers.
