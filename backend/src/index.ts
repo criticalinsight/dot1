@@ -44,6 +44,21 @@ export default {
 			headers,
 		});
 	},
+
+	/**
+	 * Handle scheduled cron events.
+	 */
+	async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+		const id = env.PROJECT_BRAIN.idFromName('global');
+		const stub = env.PROJECT_BRAIN.get(id);
+
+		// Fire-and-forget internal request to trigger deep research
+		ctx.waitUntil(
+			stub.fetch('http://internal/cron/deep-research', {
+				method: 'POST',
+			})
+		);
+	},
 };
 
 export { ProjectBrain };

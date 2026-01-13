@@ -1,4 +1,9 @@
 import { CMSTask } from '../../shared/types';
+import { DeepResearchClient } from './deepResearch';
+
+interface Env {
+  GEMINI_API_KEY?: string;
+}
 
 /**
  * ProjectBrain - Durable Object for project and task state management.
@@ -101,7 +106,84 @@ export class ProjectBrain {
       return this.handleTaskPost(request);
     }
 
+    // POST /internal/cron/deep-research
+    if (url.pathname === '/internal/cron/deep-research' && method === 'POST') {
+      return this.handleCronDeepResearch();
+    }
+
     return new Response('Not Found', { status: 404 });
+  }
+
+  /**
+   * Handles daily deep research cron job.
+   * Finds backlog tasks without research data and processes them.
+   */
+  private async handleCronDeepResearch(): Promise<Response> {
+    const apiKey = (this.env as Env).GEMINI_API_KEY;
+    if (!apiKey) {
+      console.error('GEMINI_API_KEY not configured');
+      return new Response('Missing API Key', { status: 500 });
+    }
+
+    // 1. Find candidates: backlog tasks with no research data
+    // Limit to 5 per run to avoid blowing timeouts/quotas
+    const candidates = this.sql
+      .exec("SELECT * FROM tasks WHERE status = 'backlog' AND (researchData IS NULL OR researchData = '') LIMIT 5")
+      .toArray() as unknown as CMSTask[];
+
+    if (candidates.length === 0) {
+      return Response.json({ status: 'ok', message: 'No tasks to research' });
+    }
+
+    // 2. Construct Batch Prompt
+    const titles = candidates.map(t => `- ${t.title} (ID: ${t.id})`).join('\n');
+    const prompt = `
+      You are a research assistant for a content management system.
+      Please research the following topics deeply:
+      ${titles}
+
+      For each topic, provide:
+      1. A summary of the current state/trends.
+      2. Key challenges or controversies.
+      3. At least 3 credible sources/citations.
+
+      Format the output as a JSON object where keys are the Task IDs and values are the research text.
+      Example: { "task-id-1": "Research text...", "task-id-2": "..." }
+    `;
+
+    // 3. Call Agent
+    const client = new DeepResearchClient(apiKey);
+    try {
+      const opName = await client.startResearch(prompt);
+      const result = await client.pollOperation(opName);
+
+      if (result && result.text) {
+        // 4. Parse and Update
+        // The agent might return markdown JSON blocks, need to clean
+        const jsonStr = result.text.replace(/```json/g, '').replace(/```/g, '').trim();
+        const researchMap = JSON.parse(jsonStr) as Record<string, string>;
+
+        for (const [id, data] of Object.entries(researchMap)) {
+          this.sql.exec(
+            "UPDATE tasks SET researchData = ?, updatedAt = ? WHERE id = ?",
+            data,
+            new Date().toISOString(),
+            id
+          );
+
+          // Broadcast update
+          const updatedTask = this.sql.exec("SELECT * FROM tasks WHERE id = ?", id).one() as unknown as CMSTask;
+          if (updatedTask) {
+            this.broadcast({ type: 'task_updated', task: updatedTask });
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Deep Research Failed:', e);
+      return new Response('Agent Execution Failed', { status: 500 });
+    }
+
+    return Response.json({ status: 'ok', processed: candidates.length });
   }
 
   /**

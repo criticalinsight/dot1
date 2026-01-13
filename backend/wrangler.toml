@@ -10,8 +10,9 @@ class_name = "ProjectBrain"
 tag = "v1"
 new_sqlite_classes = ["ProjectBrain"]
 
+# Cron Triggers
+[triggers]
+crons = ["0 0 * * *"] # Daily at midnight
+
 [observability]
 enabled = true
-
-# SQLite persistence for Durable Objects
-# Note: This requires the DO class to implement the 'storage' API with SQL support.
