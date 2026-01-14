@@ -54,7 +54,7 @@ function groupByStatus(tasks: CMSTask[]): Map<ContentStatus, CMSTask[]> {
  *
  * @param props.tasks - Array of CMSTask objects to display
  */
-export const KanbanBoard: Component<Props & { onCardClick?: (t: CMSTask) => void, onRun?: (id: string) => void, onRunAll?: () => void }> = (props) => {
+export const KanbanBoard: Component<Props & { onCardClick?: (t: CMSTask) => void, onRun?: (id: string) => void, onRunAll?: () => void, onAdd?: (title: string) => void }> = (props) => {
     // Memoize grouping: only recalculates when props.tasks changes
     const grouped = createMemo(() => groupByStatus(props.tasks));
 
@@ -68,6 +68,7 @@ export const KanbanBoard: Component<Props & { onCardClick?: (t: CMSTask) => void
                         onCardClick={props.onCardClick}
                         onRun={props.onRun}
                         onRunAll={status === 'draft' ? props.onRunAll : undefined}
+                        onAdd={status === 'draft' ? props.onAdd : undefined}
                     />
                 )}
             </For>

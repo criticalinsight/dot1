@@ -5,6 +5,10 @@ import { sync, getTasks, subscribe, upsertTask } from './db/store';
 import { KanbanBoard } from './components/Kanban/Board';
 import { PromptModal } from './components/PromptModal';
 
+/**
+ * Main Gemini Ops Application Component.
+ * Renders Kanban Board for prompt engineering workflow.
+ */
 const App: Component = () => {
   const [project, setProject] = createSignal<CMSProject | null>(null);
   const [tasks, setTasks] = createSignal<CMSTask[]>([]);
@@ -13,7 +17,11 @@ const App: Component = () => {
   const [selectedTask, setSelectedTask] = createSignal<CMSTask | null>(null);
   const [isModalOpen, setIsModalOpen] = createSignal(false);
 
-  const refreshTasks = async () => {
+  /**
+   * Syncs with backend and refreshes local task list.
+   * Time Complexity: O(n) where n = number of tasks
+   */
+  const refreshTasks = async (): Promise<void> => {
     const data = await sync();
     if (data.projects.length > 0) {
       setProject(data.projects[0]);
@@ -21,13 +29,21 @@ const App: Component = () => {
     }
   };
 
-  // Card Interactions
-  const handleTaskClick = (task: CMSTask) => {
+  /**
+   * Opens the Playground Modal for a selected task.
+   * @param task - The task to view/edit
+   */
+  const handleTaskClick = (task: CMSTask): void => {
     setSelectedTask(task);
     setIsModalOpen(true);
   };
 
-  const handleTaskRun = async (taskOrId: string | CMSTask) => {
+  /**
+   * Queues a task for AI generation.
+   * @param taskOrId - Task object or task ID string
+   * Time Complexity: O(n) for find if ID passed, O(1) if task passed
+   */
+  const handleTaskRun = async (taskOrId: string | CMSTask): Promise<void> => {
     let task: CMSTask | undefined;
     if (typeof taskOrId === 'string') {
       task = tasks().find(t => t.id === taskOrId);
@@ -36,27 +52,52 @@ const App: Component = () => {
     }
 
     if (task) {
-      // Optimistic update to 'queued'
       const updated = { ...task, status: 'queued' as const };
       await upsertTask(updated);
-      // NOTE: Processing happens in backend or via manual trigger for now
-      // In future, PGlite/Queue will pick this up
     }
   };
 
-  const handleTaskSave = async (updatedTask: CMSTask) => {
+  /**
+   * Saves task changes to the store.
+   * @param updatedTask - The modified task object
+   */
+  const handleTaskSave = async (updatedTask: CMSTask): Promise<void> => {
     await upsertTask(updatedTask);
   };
 
-  const handleRunAll = async () => {
+  /**
+   * Batch queues all draft tasks for generation.
+   * Time Complexity: O(n) where n = number of draft tasks
+   */
+  const handleRunAll = async (): Promise<void> => {
     const drafts = tasks().filter(t => t.status === 'draft');
     if (drafts.length === 0) return;
 
-    // Update all to queued
     const updates = drafts.map(t => ({ ...t, status: 'queued' as const }));
-
-    // Execute in parallel (upsert is async)
     await Promise.all(updates.map(t => upsertTask(t)));
+  };
+
+  /**
+   * Creates a new draft task.
+   * @param title - The initial title/prompt for the task
+   * Time Complexity: O(1)
+   */
+  const handleTaskAdd = async (title: string): Promise<void> => {
+    const proj = project();
+    if (!proj) return;
+
+    const newTask: CMSTask = {
+      id: crypto.randomUUID(),
+      projectId: proj.id,
+      title: title,
+      status: 'draft',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      prompt: title,
+      history: []
+    };
+
+    await upsertTask(newTask);
   };
 
   onMount(async () => {
@@ -99,7 +140,13 @@ const App: Component = () => {
       {/* Main Board Area */}
       <div class="flex-1 overflow-hidden p-6 relative">
         <div class="h-full w-full">
-          <KanbanBoard tasks={tasks()} onCardClick={handleTaskClick} onRun={handleTaskRun} onRunAll={handleRunAll} />
+          <KanbanBoard
+            tasks={tasks()}
+            onCardClick={handleTaskClick}
+            onRun={handleTaskRun}
+            onRunAll={handleRunAll}
+            onAdd={handleTaskAdd}
+          />
         </div>
       </div>
 

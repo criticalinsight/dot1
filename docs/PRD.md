@@ -1,128 +1,117 @@
-# Velocity CMS - Product Requirements Document
+# Gemini Operations Platform (Gemini Ops) - Product Requirements Document
 
 ## Overview
 
-**Velocity** is a lean, speed-first CLI-style task management system built on modern edge technologies. Browser-based terminal interface with real-time sync.
+**Gemini Ops** (formerly Velocity CMS) is a high-performance, edge-native operations platform for managing AI prompt engineering lifecycles. It combines a terminal-grade CLI for power users with a rich, visual Kanban interface for prompt iteration, batch testing, and version control.
 
 ## Core Value Proposition
 
-- **Edge-Native**: Cloudflare Workers + Durable Objects
-- **Real-Time Sync**: WebSocket live updates
-- **Deep Research**: Automated multi-agent research (Epistemic/Strategic)
-- **Telegram Integration**: Research reports delivered to chat
-- **Ultra-Light**: **6KB** gzipped bundle
-- **CLI Interface**: Terminal-style browser app
+- **AI-First Workflow**: dedicated lifecycle stats (Draft -> Queued -> Generating -> Deployed).
+- **Prompt Engineering**: Split-view playground, markdown rendering, parameter tuning (Top-P, Temp), and version history.
+- **Edge-Native Speed**: 6KB initial bundle, instant loads via Edge Caching.
+- **Hybrid Database Architecture**: PGlite (WASM) for powerful local querying + Edge SQLite for global persistence.
+- **Real-Time Sync**: Bi-directional WebSocket synchronization.
 
-## Current State (v3.0)
+## Key User Workflows (Refined)
+
+### 1. Prompt Creation (The "Draft" Cycle)
+*   **Trigger**: User clicks `+` button in "Draft Prompts" column header.
+*   **Action**: Opens a blank card or focused input at the top of the column.
+*   **Input**: User types raw prompt concept (e.g., "Summarize this article").
+*   **State**: Task created in `draft` status. Project default parameters applied.
+
+### 2. Prompt Engineering (The Playground)
+*   **Trigger**: User clicks any card.
+*   **UI**: Opens Split-View Modal.
+    *   *Left*: Prompt Editor (Textarea), Param Controls (Top-P, Temp), System Instructions.
+    *   *Right*: Markdown Preview of latest output.
+*   **Action**: User modifies prompt and hits `Cmd+Enter` (Run) or `Cmd+S` (Save).
+*   **History**: Every "Run" creates a version snapshot. User can click timeline dots to revert.
+
+### 3. Batch Execution
+*   **Context**: User has multiple concepts in "Draft".
+*   **Action**: Click `Run All` in column header.
+*   **System**: 
+    1.  Validates all drafts.
+    2.  Moves all to `queued`.
+    3.  Backend processes concurrently (respecting rate limits).
+    4.  Cards update to `generating` -> `deployed` live.
+
+### 4. Analysis & refinement
+*   **Context**: Tasks are `deployed` (have results).
+*   **Action**: User reviews outputs in header/preview mode on board, or opens modal for full read.
+*   **Next Step**: 
+    *   *Good*: Archive/Star (Future).
+    *   *Bad*: Edit prompt in Modal -> New Version -> Re-run.
+
+---
+
+## Current State (v3.2 - Gemini Ops)
 
 | Feature | Status |
 |---------|--------|
-| Browser CLI interface | ✅ |
-| Commands: ls, add, mv, clear, help | ✅ |
-| SQLite Durable Object backend | ✅ |
-| WebSocket real-time sync | ✅ |
-| Deep Research Agent (Gemini 3.0 Pro) | ✅ |
-| Telegram Reports | ✅ |
-| Virtual Scrolling (10k+ lines) | ✅ |
-| Multi-Tab Terminal Interface | ✅ |
-| 6KB gzipped bundle | ✅ |
+| **Gemini Ops Kanban Board** | ✅ |
+| -- Draft/Queued/Generating/Deployed Columns | ✅ |
+| -- Batch "Run All" Operations | ✅ |
+| -- Card Anatomy (Prompt/Output/Tokens) | ✅ |
+| -- "Add Task" Button/Input | ✅ |
+| -- Drag & Drop Reordering | ❌ (Planned) |
+| **Playground Modal** | ✅ |
+| -- Split View (Input / Markdown Output) | ✅ |
+| -- Parameter Controls (Temp, Top-P) | ✅ |
+| -- Version History & Rollback | ✅ |
 
 ---
 
-## Speed Enhancements Roadmap
+## Technical Stack Architecture (Target)
 
-### Phase 1: Network (v2.3 - Feb 2026)
-| Enhancement | Impact | Effort |
-|-------------|--------|--------|
-| HTTP/3 QUIC support | -20ms latency | Low |
-| Brotli compression | -15% payload | Low |
-| Edge caching (stale-while-revalidate) | -50ms TTFB | Done ✅ |
-| Connection keepalive | -100ms reconnect | Medium |
-
-### Phase 2: Runtime (v2.4 - Mar 2026)
-| Enhancement | Impact | Effort |
-|-------------|--------|--------|
-| WebSocket binary protocol | -30% message size | Medium |
-| Batch command execution | -n× round trips | Medium |
-| Optimistic UI updates | Instant feedback | Low |
-| Debounced sync (100ms) | -80% network calls | Low |
-
-### Phase 3: Backend (v2.5 - Apr 2026)
-| Enhancement | Impact | Effort |
-|-------------|--------|--------|
-| SQLite WAL mode | 10x write speed | Low |
-| Prepared statements | -5ms query time | Done ✅ |
-| Index on (projectId, status) | O(log n) queries | Done ✅ |
-| Query result streaming | -50% memory | High |
-
-### Phase 4: Bundle (v2.6 - May 2026) ✅
-| Enhancement | Impact | Effort |
-|-------------|--------|--------|
-| Tree-shake SolidJS | -2KB | Low |
-| Inline critical CSS | -1 request | Done ✅ |
-| Preload hints | -100ms FCP | Done ✅ |
-| Service Worker caching | Offline capable | Medium |
+| Layer | Technology | Role |
+|-------|------------|------|
+| **Frontend Framework** | **SolidJS** | Signal-based reactivity, no VDOM. Ultra-light. |
+| **Local Database** | **PGlite** | PostgreSQL compiled to WASM. Runs in browser for complex local queries and offline capability. |
+| **Edge Backend** | **Cloudflare Workers** + **Durable Objects** | Serverless compute and state management. |
+| **Edge Database** | **Native SQLite** | Embedded in Durable Objects for low-latency global persistence. |
+| **Communication** | **WebSockets** | Bi-directional sync between Local PGlite and Edge SQLite. |
+| **Styling** | **Tailwind CSS** | Utility-first styling. |
 
 ---
 
-## Advanced Speed Optimizations (v3.0+)
+## Roadmap: Stack Migration & Refinement
 
-### Phase 5: Edge Computing (Jun 2026)
-| Enhancement | Impact | Effort |
-|-------------|--------|--------|
-| Smart Caching | Cache per-user at edge | Medium |
-| Edge KV for session | -50ms auth lookup | Low |
-| Geographic routing | -30ms for distant users | Low |
-| Request coalescing | -n× concurrent requests | Medium |
+### Phase 1: Local Intelligence (PGlite Integration)
+- [ ] Replace current `db/store.ts` (in-memory/localStorage) with **PGlite**.
+- [ ] Implement local SQL querying for advanced filtering/sorting of tasks.
+- [ ] Persist PGlite state to IndexedDB.
 
-### Phase 6: Protocol (Jul 2026)
-| Enhancement | Impact | Effort |
-|-------------|--------|--------|
-| MessagePack over WS | -40% payload vs JSON | Medium |
-| Delta sync | Only send changed fields | High |
-| Compression (zstd) | -60% message size | Low |
-| Multiplexing | Single connection for all | High |
+### Phase 2: Enhanced Sync (WebSocket Protocol)
+- [ ] Upgrade current simple WebSocket buffer to a robust Sync Protocol.
+- [ ] Handle conflict resolution between Local PGlite and Edge SQLite.
+- [ ] Implement delta updates (MessagePack).
 
-### Phase 7: Rendering (Active - v3.0) ✅
-| Enhancement | Impact | Effort |
-|-------------|--------|--------|
-| Virtual scrolling | O(1) render for 10k items | Done ✅ |
-| requestIdleCallback | Non-blocking updates | Done ✅ |
-| Web Workers | Off-main-thread processing | Done ✅ |
-| Canvas rendering | 60fps for large lists | Skipped |
+### Phase 3: Advanced Prompt Ops
+- [ ] Compare Mode: Select multiple versions to view side-by-side.
+- [ ] Evaluation Framework: Automated scoring of outputs against test cases.
+- [ ] Template Library: Reusable system prompts.
 
-### Phase 8: Extreme (Active - v3.0) ✅
-| Enhancement | Impact | Effort |
-|-------------|--------|--------|
-| Web Worker CLI | 0ms UI blocking | Done ✅ |
-| SharedArrayBuffer | Zero-copy data transfer | Deferred |
-| COOP/COEP Headers | Security for High-Res timers | Done ✅ |
-| Predictive prefetch | Anticipate user actions | Planned |
+### Phase 4: UI Polish & Animations
+- [ ] Drag-and-Drop for Kanban columns.
+- [ ] Optimistic UI updates for all actions.
+- [ ] Enter/Exit animations for cards.
 
 ---
 
 ## Success Metrics
 
-| Metric | Current | Target v3.0 | Target v4.0 |
-|--------|---------|-------------|-------------|
-| Bundle (gzip) | **6KB** | <5KB | <3KB |
-| First paint | ~200ms | <100ms | <50ms |
-| Sync latency | ~50ms | <20ms | <10ms |
-| Backend cold start | ~30ms | <10ms | <5ms |
-| Offline capable | ❌ | ⏳ | ✅ |
-
-## Technical Stack
-
-| Layer | Technology |
-|-------|------------|
-| Frontend | SolidJS, Vite, Terminal CSS |
-| Backend | Cloudflare Workers, Durable Objects |
-| Database | SQLite (DO) |
-| Protocol | HTTPS/WSS, MessagePack |
+| Metric | Current | Target v4.0 |
+|--------|---------|-------------|
+| Bundle Size (gzip) | ~66KB | <50KB (excluding WASM) |
+| Time to Interactive | ~300ms | <100ms |
+| Local Query Speed | N/A | <10ms (via PGlite) |
+| Sync Latency | ~100ms | <50ms |
+| Offline Support | Partial | Full (Read/Write) |
 
 ## Non-Goals
+- Multi-tenant SaaS (Single-tenant / Personal usage focus).
+- File uploads (Text/Code focus).
 
-- Rich text editor
-- File uploads
-- Multi-tenant
 
