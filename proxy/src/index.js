@@ -4,9 +4,9 @@ export default {
 
         // Target the Pages deployment
         // Incoming: https://moecapital.com/1/assets/...
-        // Target:   https://dot1-e8r-axc.pages.dev/1/assets/...  (NOTE: STRIP /1/ - NO, keep it)
+        // Target:   https://master.dot1-e8r-axc.pages.dev/1/assets/...
 
-        url.hostname = 'dot1-e8r-axc.pages.dev';
+        url.hostname = 'master.dot1-e8r-axc.pages.dev';
         url.protocol = 'https:';
 
         // Do NOT remove /1 prefix because the Pages deployment now has the content at /1/
