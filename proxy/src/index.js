@@ -9,11 +9,11 @@ export default {
         url.hostname = 'dot1-e8r.pages.dev';
         url.protocol = 'https:';
 
-        // Remove the /1 prefix from the pathname for the origin fetch
-        // because Pages hosts the content at the root.
-        if (url.pathname.startsWith('/1')) {
-            url.pathname = url.pathname.replace('/1', '');
-        }
+        // Do NOT remove /1 prefix because the Pages deployment now has the content at /1/
+        // to match the public URL structure and asset paths.
+        // if (url.pathname.startsWith('/1')) {
+        //    url.pathname = url.pathname.replace('/1', '');
+        // }
 
         const proxyRequest = new Request(url, request);
 
