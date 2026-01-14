@@ -12,9 +12,11 @@
     "@tailwindcss/postcss": "^4.1.18",
     "@tailwindcss/vite": "^4.1.18",
     "lucide-solid": "^0.562.0",
+    "marked": "^17.0.1",
     "solid-js": "^1.9.10"
   },
   "devDependencies": {
+    "@types/marked": "^5.0.2",
     "@types/node": "^24.10.1",
     "autoprefixer": "^10.4.23",
     "jsdom": "^27.4.0",

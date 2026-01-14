@@ -89,6 +89,21 @@ const App: Component = () => {
     // Sync happens in background
   };
 
+  const handleRunAll = async () => {
+    const drafts = tasks().filter(t => t.status === 'draft');
+    if (drafts.length === 0) return;
+
+    printToCli(`Batch running ${drafts.length} tasks...`, 'command');
+
+    // Update all to queued
+    const updates = drafts.map(t => ({ ...t, status: 'queued' as const }));
+
+    // Execute in parallel (upsert is async)
+    await Promise.all(updates.map(t => upsertTask(t)));
+
+    printToCli(`Queued ${updates.length} tasks for generation.`, 'success');
+  };
+
   const handleCommand = (cmd: string) => {
     printToCli(`$ ${cmd}`, 'command');
     // If command entered while not on CLI tab, maybe switch to it? 
@@ -227,7 +242,7 @@ const App: Component = () => {
                     I'll assume global event delegation or update Board.tsx next. 
                     Actually, let's update Board.tsx to accept onCardClick prop. 
                 */}
-            <KanbanBoard tasks={tasks()} onCardClick={handleTaskClick} onRun={handleTaskRun} />
+            <KanbanBoard tasks={tasks()} onCardClick={handleTaskClick} onRun={handleTaskRun} onRunAll={handleRunAll} />
             {/* We'll need to patch Board.tsx to bubble events up, or use a Store.
                     For this sprint, I will assume Board.tsx emits events via a simple global listener or direct prop. 
                     I'll update Board in next step.

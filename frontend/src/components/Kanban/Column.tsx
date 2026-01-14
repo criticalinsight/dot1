@@ -25,7 +25,7 @@ const STATUS_LABELS: Record<ContentStatus, string> = {
  * @param props.status - The status this column represents
  * @param props.tasks - Array of tasks with this status
  */
-export const KanbanColumn: Component<Props & { onCardClick?: (t: CMSTask) => void, onRun?: (id: string) => void }> = (props) => {
+export const KanbanColumn: Component<Props & { onCardClick?: (t: CMSTask) => void, onRun?: (id: string) => void, onRunAll?: () => void }> = (props) => {
     return (
         <div class="flex-shrink-0 w-72 flex flex-col gap-3">
             <div class="flex items-center justify-between px-1">
@@ -35,6 +35,14 @@ export const KanbanColumn: Component<Props & { onCardClick?: (t: CMSTask) => voi
                         {props.tasks.length}
                     </span>
                 </h3>
+                <Show when={props.status === 'draft' && props.tasks.length > 0}>
+                    <button
+                        class="text-[10px] font-bold text-blue-500 hover:text-blue-400 hover:bg-blue-900/30 px-2 py-0.5 rounded transition-colors uppercase tracking-tight"
+                        onClick={props.onRunAll}
+                    >
+                        Run All
+                    </button>
+                </Show>
             </div>
 
             <div class="flex-1 flex flex-col gap-2 min-h-[400px] p-2 bg-slate-900/30 rounded-xl border border-slate-800/50">
