@@ -52,7 +52,8 @@ export async function executeCommand(cmd: string, ctx: CommandContext): Promise<
                 id: crypto.randomUUID(),
                 projectId: ctx.project.id,
                 title,
-                status: 'backlog',
+                prompt: title, // Default prompt to title
+                status: 'draft',
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
             };

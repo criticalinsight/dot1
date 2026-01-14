@@ -58,7 +58,13 @@ export class ProjectBrain {
         id TEXT PRIMARY KEY,
         projectId TEXT NOT NULL,
         title TEXT NOT NULL,
+        prompt TEXT,
         status TEXT NOT NULL DEFAULT 'backlog',
+        model TEXT,
+        output TEXT,
+        tokenUsage TEXT, 
+        parameters TEXT,
+        history TEXT,
         researchData TEXT,
         contentDraft TEXT,
         publishedUrl TEXT,
@@ -72,6 +78,18 @@ export class ProjectBrain {
       CREATE INDEX IF NOT EXISTS idx_tasks_projectId ON tasks(projectId);
       CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
     `);
+
+    // Migration for existing tables: Add new columns if missing
+    try {
+      this.sql.exec("ALTER TABLE tasks ADD COLUMN prompt TEXT");
+      this.sql.exec("ALTER TABLE tasks ADD COLUMN model TEXT");
+      this.sql.exec("ALTER TABLE tasks ADD COLUMN output TEXT");
+      this.sql.exec("ALTER TABLE tasks ADD COLUMN tokenUsage TEXT");
+      this.sql.exec("ALTER TABLE tasks ADD COLUMN parameters TEXT");
+      this.sql.exec("ALTER TABLE tasks ADD COLUMN history TEXT");
+    } catch (e) {
+      // Ignored: Columns likely exist
+    }
   }
 
   /**
@@ -113,6 +131,11 @@ export class ProjectBrain {
     // POST /telegram/webhook
     if (url.pathname === '/telegram/webhook' && method === 'POST') {
       return this.handleTelegramWebhook(request);
+    }
+
+    // POST /internal/debug-research
+    if (url.pathname === '/internal/debug-research' && method === 'POST') {
+      return this.handleDebugResearch();
     }
 
     return new Response('Not Found', { status: 404 });
@@ -161,6 +184,25 @@ export class ProjectBrain {
     }
   }
 
+  // Debug endpoint implementation
+  private async handleDebugResearch(): Promise<Response> {
+    const apiKey = (this.env as Env).GEMINI_API_KEY;
+    if (!apiKey) return Response.json({ error: 'Missing API Key' }, { status: 500 });
+
+    const client = new DeepResearchClient(apiKey);
+    try {
+      // Standard API is synchronous now
+      const resultText = await client.startResearch("What is the capital of Kenya?");
+      return Response.json({ status: 'success', result: { text: resultText } });
+    } catch (e: any) {
+      return Response.json({
+        status: 'error',
+        message: e.message,
+        stack: e.stack
+      }, { status: 500 });
+    }
+  }
+
   /**
    * Handles daily cron: Generates recurring tasks, then researches backlog.
    */
@@ -169,11 +211,11 @@ export class ProjectBrain {
     if (!apiKey) return new Response('Missing API Key', { status: 500 });
 
     try {
-      // 1. Generate recurring tasks
       await this.generateRecurringTasks();
-
-      // 2. Perform Deep Research on backlog
-      return this.performDeepResearch(apiKey);
+      // Fire and forget research (or await if simple worker)
+      // DO context allows async background work
+      this.performDeepResearch(apiKey);
+      return new Response('Cron Triggered');
     } catch (e) {
       console.error('Daily Cron Failed:', e);
       return new Response('Internal Error', { status: 500 });
@@ -211,23 +253,23 @@ export class ProjectBrain {
       // 2. Create TODAY's task immediately (so user doesn't wait 24h)
       const taskId = crypto.randomUUID();
       this.sql.exec(
-        "INSERT INTO tasks (id, projectId, title, status, createdAt, updatedAt) VALUES (?, ?, ?, 'backlog', ?, ?)",
+        "INSERT INTO tasks (id, projectId, title, status, createdAt, updatedAt) VALUES (?, ?, ?, 'draft', ?, ?)",
         taskId, projectId, def.title, now, now
       );
 
       this.broadcast({
         type: 'task_updated',
-        task: { id: taskId, projectId, title: def.title, status: 'backlog', createdAt: now, updatedAt: now }
+        task: { id: taskId, projectId, title: def.title, status: 'draft', createdAt: now, updatedAt: now }
       });
 
       createdIds.push(taskId);
     }
 
     // Trigger research immediately for these new tasks
-    const apiKey = (this.env as Env).GEMINI_API_KEY;
-    if (apiKey) {
-      this.performDeepResearch(apiKey, createdIds);
-    }
+    // const apiKey = (this.env as Env).GEMINI_API_KEY;
+    // if (apiKey) {
+    //   this.performDeepResearch(apiKey, createdIds);
+    // }
 
     return Response.json({ status: 'ok', tasks: createdIds, message: "Projects set to daily" });
   }
@@ -247,9 +289,9 @@ export class ProjectBrain {
       const dateStr = now.toISOString().split('T')[0];
       const title = `${proj.name} - ${dateStr}`;
 
-      // Create new task in backlog
+      // Create new task in draft
       this.sql.exec(
-        "INSERT INTO tasks (id, projectId, title, status, createdAt, updatedAt) VALUES (?, ?, ?, 'backlog', ?, ?)",
+        "INSERT INTO tasks (id, projectId, title, status, createdAt, updatedAt) VALUES (?, ?, ?, 'draft', ?, ?)",
         taskId,
         proj.id,
         title,
@@ -268,7 +310,7 @@ export class ProjectBrain {
 
       this.broadcast({
         type: 'task_updated',
-        task: { id: taskId, projectId: proj.id, title, status: 'backlog', createdAt: now.toISOString(), updatedAt: now.toISOString() }
+        task: { id: taskId, projectId: proj.id, title, status: 'draft', createdAt: now.toISOString(), updatedAt: now.toISOString() }
       });
     }
   }
@@ -281,69 +323,64 @@ export class ProjectBrain {
     const telegramToken = (this.env as Env).TELEGRAM_BOT_TOKEN;
     let candidates: CMSTask[] = [];
 
+    // Prioritize 'queued' status for processing
+    // Legacy support: also check 'backlog' (now 'draft' effectively, but we use 'queued' for active processing)
+
     if (taskIds && taskIds.length > 0) {
-      // Fetch specific tasks requested
       const placeholders = taskIds.map(() => '?').join(',');
       candidates = this.sql.exec(`SELECT * FROM tasks WHERE id IN (${placeholders})`, ...taskIds).toArray() as unknown as CMSTask[];
     } else {
-      // Default backlog fetch
       candidates = this.sql
-        .exec("SELECT * FROM tasks WHERE status = 'backlog' AND (researchData IS NULL OR researchData = '') LIMIT 5")
+        .exec("SELECT * FROM tasks WHERE status = 'queued' LIMIT 5")
         .toArray() as unknown as CMSTask[];
     }
 
     if (candidates.length === 0) {
-      return Response.json({ status: 'ok', message: 'No tasks to research' });
+      return Response.json({ status: 'ok', message: 'No queued tasks' });
     }
 
     const client = new DeepResearchClient(apiKey);
 
-    // Process one by one or batch?
-    // The prompts are very different now. Better to run them individually or grouped by prompt type.
-    // Deep Research Agent can handle multiple questions, but mixing "Rotary" and "Crypto" in one prompt might confuse it or hit output limits.
-    // Let's run them individually for reliability in this "Advanced" mode.
-
-    // Get Chat ID
     const chatIdRow = this.sql.exec("SELECT value FROM system_settings WHERE key = 'telegram_chat_id'").one() as { value: string } | null;
     const chatId = chatIdRow?.value;
 
     for (const task of candidates) {
+      // Switch to generating
+      this.sql.exec("UPDATE tasks SET status = 'generating', updatedAt = ? WHERE id = ?", new Date().toISOString(), task.id);
+      this.broadcast({ type: 'task_updated', task: { ...task, status: 'generating' } });
+
       const systemPrompt = getPromptForTask(task.title);
-      const userMessage = `Task: ${task.title}`;
+      // Use task.prompt if available, else fallback to title
+      const userMessage = task.prompt ? `Task: ${task.prompt}` : `Task: ${task.title}`;
       const fullPrompt = `${systemPrompt}\n\n${userMessage}`;
 
       try {
-        const opName = await client.startResearch(fullPrompt);
+        // Synchronous call to Gemini 3.0 Pro
+        const resultText = await client.startResearch(fullPrompt);
 
-        // Polling asynchronously - we don't await the result here to avoid blocking other tasks if we were serial.
-        // But since we're in a loop, we likely have to wait or spawn multiple promises.
-        // Cloudflare DO can handle multiple async operations.
+        // Update task with result, status = deployed
+        this.sql.exec(
+          "UPDATE tasks SET output = ?, researchData = ?, status = 'deployed', updatedAt = ? WHERE id = ?",
+          resultText, // New field
+          resultText, // Legacy field
+          new Date().toISOString(),
+          task.id
+        );
 
-        // We'll wait for each to ensure we don't hit rate limits too hard.
-        const result = await client.pollOperation(opName);
+        const updated = this.sql.exec("SELECT * FROM tasks WHERE id = ?", task.id).one() as unknown as CMSTask;
+        // Deserialize JSON fields for broadcast if we were doing that (but we send raw DB rows basically)
+        // Note: Our DB has 'output' column now.
+        if (updated) this.broadcast({ type: 'task_updated', task: updated });
 
-        if (result && result.text) {
-          this.sql.exec(
-            "UPDATE tasks SET researchData = ?, updatedAt = ? WHERE id = ?",
-            result.text,
-            new Date().toISOString(),
-            task.id
-          );
-
-          // Broadcast
-          const updated = this.sql.exec("SELECT * FROM tasks WHERE id = ?", task.id).one() as unknown as CMSTask;
-          if (updated) this.broadcast({ type: 'task_updated', task: updated });
-
-          // Telegram Notification (FULL OUTPUT)
-          if (telegramToken && chatId) {
-            const header = `📊 *Research Complete*\n**${task.title}**\n\n`;
-            // Send header then the full text
-            await this.sendTelegramMessage(telegramToken, chatId, header + result.text);
-          }
+        if (telegramToken && chatId) {
+          const header = `📊 *Gemini Ops Complete*\n**${task.title}**\n\n`;
+          await this.sendTelegramMessage(telegramToken, chatId, header + resultText);
         }
       } catch (error) {
         console.error(`Research failed for task ${task.id}:`, error);
-        // Continue to next task
+        // Revert to draft or queued? Let's say draft on error
+        this.sql.exec("UPDATE tasks SET status = 'draft' WHERE id = ?", task.id);
+        this.broadcast({ type: 'task_updated', task: { ...task, status: 'draft' } });
       }
     }
 
@@ -370,7 +407,7 @@ export class ProjectBrain {
       .exec('SELECT id, name FROM projects')
       .toArray();
 
-    let tasksQuery = 'SELECT id, projectId, title, status, createdAt, updatedAt FROM tasks';
+    let tasksQuery = 'SELECT * FROM tasks'; // Select * to get new columns
     let tasksParams: any[] = [];
 
     if (since) {
@@ -378,7 +415,15 @@ export class ProjectBrain {
       tasksParams.push(since);
     }
 
-    const tasks = this.sql.exec(tasksQuery, ...tasksParams).toArray();
+    const tasksRaw = this.sql.exec(tasksQuery, ...tasksParams).toArray();
+    // Parse JSON fields
+    const tasks = tasksRaw.map((t: any) => ({
+      ...t,
+      tokenUsage: t.tokenUsage ? JSON.parse(t.tokenUsage) : undefined,
+      parameters: t.parameters ? JSON.parse(t.parameters) : undefined,
+      history: t.history ? JSON.parse(t.history) : undefined,
+    }));
+
     const body = JSON.stringify({ projects, tasks });
 
     // Generate weak ETag
@@ -433,28 +478,44 @@ export class ProjectBrain {
     if (!task.title || typeof task.title !== 'string' || task.title.length > 500) {
       return new Response('Invalid task title', { status: 400 });
     }
-    if (!task.projectId || typeof task.projectId !== 'string') {
-      return new Response('Invalid projectId', { status: 400 });
-    }
+
+    // Default projectId to 'default' if missing (migration safety)
+    const projectId = task.projectId || 'default';
 
     const now = new Date().toISOString();
-    const status = task.status || 'backlog';
+    const status = task.status || 'draft';
     const createdAt = task.createdAt || now;
     const updatedAt = task.updatedAt || now;
 
     this.sql.exec(
-      'INSERT OR REPLACE INTO tasks (id, projectId, title, status, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)',
+      `INSERT OR REPLACE INTO tasks (
+        id, projectId, title, prompt, status, model, output, tokenUsage, parameters, history, 
+        researchData, contentDraft, publishedUrl, createdAt, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       task.id,
-      task.projectId,
+      projectId,
       task.title,
+      task.prompt || null,
       status,
+      task.model || null,
+      task.output || null,
+      task.tokenUsage ? JSON.stringify(task.tokenUsage) : null,
+      task.parameters ? JSON.stringify(task.parameters) : null,
+      task.history ? JSON.stringify(task.history) : null,
+      task.researchData || null,
+      task.contentDraft || null,
+      task.publishedUrl || null,
       createdAt,
       updatedAt
     );
 
     this.broadcast({
       type: 'task_updated',
-      task: { id: task.id, projectId: task.projectId, title: task.title, status, createdAt, updatedAt },
+      task: {
+        id: task.id, projectId, title: task.title, prompt: task.prompt, status,
+        model: task.model, output: task.output, tokenUsage: task.tokenUsage, parameters: task.parameters, history: task.history,
+        createdAt, updatedAt
+      },
     });
 
     return Response.json({ status: 'ok' });

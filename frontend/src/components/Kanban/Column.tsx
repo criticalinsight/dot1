@@ -10,11 +10,10 @@ interface Props {
 
 /** Human-readable status labels */
 const STATUS_LABELS: Record<ContentStatus, string> = {
-    backlog: 'Backlog',
-    researching: 'Researching',
-    drafting: 'Drafting',
-    review: 'Review',
-    published: 'Published',
+    draft: 'Draft Prompts',
+    queued: 'Queued',
+    generating: 'Generating',
+    deployed: 'Deployed',
 };
 
 /**
@@ -26,7 +25,7 @@ const STATUS_LABELS: Record<ContentStatus, string> = {
  * @param props.status - The status this column represents
  * @param props.tasks - Array of tasks with this status
  */
-export const KanbanColumn: Component<Props> = (props) => {
+export const KanbanColumn: Component<Props & { onCardClick?: (t: CMSTask) => void, onRun?: (id: string) => void }> = (props) => {
     return (
         <div class="flex-shrink-0 w-72 flex flex-col gap-3">
             <div class="flex items-center justify-between px-1">
@@ -39,7 +38,13 @@ export const KanbanColumn: Component<Props> = (props) => {
             </div>
 
             <div class="flex-1 flex flex-col gap-2 min-h-[400px] p-2 bg-slate-900/30 rounded-xl border border-slate-800/50">
-                <For each={props.tasks}>{(task) => <KanbanCard task={task} />}</For>
+                <For each={props.tasks}>{(task) =>
+                    <KanbanCard
+                        task={task}
+                        onClick={props.onCardClick}
+                        onRun={props.onRun}
+                    />
+                }</For>
 
                 <Show when={props.tasks.length === 0}>
                     <div class="flex-1 flex items-center justify-center opacity-30">

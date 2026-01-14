@@ -1,10 +1,13 @@
 import type { Component } from 'solid-js';
-import { createSignal, onMount, onCleanup } from 'solid-js';
+import { createSignal, onMount, onCleanup, Show } from 'solid-js';
 import type { CMSProject, CMSTask } from '../../shared/types';
-import { sync, getTasks, subscribe } from './db/store';
-// import { executeCommand } from './commands'; // Moved to worker
+import { sync, getTasks, subscribe, upsertTask } from './db/store';
 import { VirtualList } from './components/VirtualList';
-import CliWorker from './workers/cli.worker?worker'; // Vite worker import
+import { TabBar } from './components/TabBar';
+import type { Tab } from './components/TabBar';
+import { KanbanBoard } from './components/Kanban/Board';
+import { PromptModal } from './components/PromptModal';
+import CliWorker from './workers/cli.worker?worker';
 import type { WorkerMessage, WorkerResponse } from './workers/cli.worker';
 
 interface OutputLine {
@@ -15,25 +18,39 @@ interface OutputLine {
 const App: Component = () => {
   const [project, setProject] = createSignal<CMSProject | null>(null);
   const [tasks, setTasks] = createSignal<CMSTask[]>([]);
-  const [output, setOutput] = createSignal<OutputLine[]>([]);
+  // Tabs: 'board' is main, others are terminal/tasks
+  const [tabs, setTabs] = createSignal<Tab[]>([
+    { id: 'board', title: 'Gemini Ops', type: 'terminal' }, // Using 'terminal' styling for main tab
+    { id: 'cli', title: 'Terminal', type: 'terminal' }
+  ]);
+  const [activeTabId, setActiveTabId] = createSignal('board');
+  const [tabOutputs, setTabOutputs] = createSignal<Record<string, OutputLine[]>>({ 'cli': [] });
+
+  // Modal State
+  const [selectedTask, setSelectedTask] = createSignal<CMSTask | null>(null);
+  const [isModalOpen, setIsModalOpen] = createSignal(false);
+
   const [input, setInput] = createSignal('');
   const [ready, setReady] = createSignal(false);
+  // History state...
   const [history, setHistory] = createSignal<string[]>([]);
   const [historyIdx, setHistoryIdx] = createSignal(-1);
   let inputRef: HTMLInputElement | undefined;
 
-  // Phase 8: Worker Instance
   const worker = new CliWorker();
 
-  const print = (text: string, type: OutputLine['type'] = 'output') => {
-    // Phase 7: Removing 100 line limit because VirtualList handles it
-    setOutput((prev) => [...prev, { type, text }]);
+  // Helper: Print to CLI tab
+  const printToCli = (text: string, type: OutputLine['type'] = 'output') => {
+    setTabOutputs((prev) => ({
+      ...prev,
+      ['cli']: [...(prev['cli'] || []), { type, text }]
+    }));
   };
 
   const handleWorkerMessage = (e: MessageEvent<WorkerResponse>) => {
     const { type, output: newLines } = e.data;
     if (type === 'RESULT' || type === 'ERROR') {
-      newLines.forEach(l => print(l.text, l.type as any));
+      newLines.forEach(l => printToCli(l.text, l.type as any));
     }
   };
 
@@ -45,23 +62,89 @@ const App: Component = () => {
     }
   };
 
+  // Card Interactions
+  const handleTaskClick = (task: CMSTask) => {
+    setSelectedTask(task);
+    setIsModalOpen(true);
+  };
+
+  const handleTaskRun = async (taskOrId: string | CMSTask) => {
+    let task: CMSTask | undefined;
+    if (typeof taskOrId === 'string') {
+      task = tasks().find(t => t.id === taskOrId);
+    } else {
+      task = taskOrId;
+    }
+
+    if (task) {
+      // Optimistic update to 'queued'
+      const updated = { ...task, status: 'queued' as const }; // cast for type safety if needed
+      await upsertTask(updated);
+      printToCli(`Queued task: ${task.title}`, 'success');
+    }
+  };
+
+  const handleTaskSave = async (updatedTask: CMSTask) => {
+    await upsertTask(updatedTask);
+    // Sync happens in background
+  };
+
   const handleCommand = (cmd: string) => {
-    print(`$ ${cmd}`, 'command');
+    printToCli(`$ ${cmd}`, 'command');
+    // If command entered while not on CLI tab, maybe switch to it? 
+    // Or just let it run in bg.
+    if (activeTabId() !== 'cli') {
+      // Optional: setActiveTabId('cli');
+    }
+
     if (cmd === 'clear') {
-      setOutput([]);
+      setTabOutputs(prev => ({ ...prev, ['cli']: [] }));
       return;
     }
 
-    // Phase 8: Off-main-thread execution
+    // Special Command: open <taskId>
+    if (cmd.startsWith('open ')) {
+      const target = cmd.replace('open ', '').trim();
+      // Try to find task by ID or Title (fuzzy?)
+      const task = tasks().find(t => t.id === target || t.title.includes(target)); // Simple substring match for convenience
+
+      if (task) {
+        openTaskTab(task);
+        return;
+      } else {
+        printToCli('Task not found.', 'error');
+        return;
+      }
+    }
+
+    // Worker Execution
     worker.postMessage({
       id: crypto.randomUUID(),
       type: 'EXECUTE',
       payload: {
         cmd,
         project: project(),
-        tasks: tasks() // Structured clone of tasks array
+        tasks: tasks()
       }
     } as WorkerMessage);
+  };
+
+  const openTaskTab = (task: CMSTask) => {
+    // Legacy support for 'open' command - creates a tab
+    if (!tabs().find(t => t.id === task.id)) {
+      setTabs(prev => [...prev, { id: task.id, title: task.title.slice(0, 15) + '...', type: 'task' }]);
+      setTabOutputs(prev => ({ ...prev, [task.id]: [{ type: 'output', text: task.researchData || '' }] }));
+    }
+    setActiveTabId(task.id);
+  };
+
+  const closeTab = (id: string) => {
+    setTabs(prev => prev.filter(t => t.id !== id));
+    setTabOutputs(prev => {
+      const { [id]: _, ...rest } = prev;
+      return rest;
+    });
+    if (activeTabId() === id) setActiveTabId('board');
   };
 
   const handleSubmit = async (e: Event) => {
@@ -75,7 +158,9 @@ const App: Component = () => {
     }
   };
 
+  // Keyboard history...
   const handleKeyDown = (e: KeyboardEvent) => {
+    // Standard history logic
     const h = history();
     if (e.key === 'ArrowUp') {
       e.preventDefault();
@@ -92,20 +177,14 @@ const App: Component = () => {
 
   onMount(async () => {
     document.getElementById('loader')?.remove();
-    worker.onmessage = handleWorkerMessage; // Bind worker listener
+    worker.onmessage = handleWorkerMessage;
+    printToCli('Velocity Gemini Ops v3.1', 'output');
 
-    print('Velocity CLI v3.0 (Phase 8: Extreme)', 'output');
-
-    // Phase 7: Idle Callback for initial sync
     if ('requestIdleCallback' in window) {
       requestIdleCallback(() => refreshTasks());
     } else {
       await refreshTasks();
     }
-
-    // print(`${tasks().length} tasks loaded`, 'success');
-    // Warning: tasks() might be empty initially if idle callback hasn't run.
-
     setReady(true);
     inputRef?.focus();
 
@@ -122,24 +201,54 @@ const App: Component = () => {
   return (
     <div class="terminal" onClick={() => inputRef?.focus()}>
       <header class="terminal-header">
-        <div class="terminal-title">velocity@{project()?.name || 'edge'} [Worker: ON]</div>
-        <div class="terminal-status">{tasks().length}</div>
+        <div class="terminal-title">Gemini Ops@{project()?.name || 'hub'}</div>
+        <div class="terminal-status">{tasks().length} Tasks</div>
       </header>
 
-      <div class="terminal-body">
-        {/* Phase 7: Virtual Rendering of Output */}
-        <VirtualList
-          items={output()}
-          rowHeight={24} // Approximate line height for monospace font
-          height="calc(100% - 40px)" // Leave room for input line
-          scrollToBottom={true}
-          renderRow={(line) => (
-            <div class={`line line-${line.type}`}>{line.text || '\u00A0'}</div>
-          )}
-        />
+      <TabBar
+        tabs={tabs()}
+        activeTabId={activeTabId()}
+        onTabClick={setActiveTabId}
+        onTabClose={closeTab}
+      />
+
+      <div class="terminal-body" style={{ height: 'calc(100% - 72px)', position: 'relative' }}>
+
+        {/* View Switcher based on Tab */}
+        <Show when={activeTabId() === 'board'}>
+          <div class="h-full overflow-hidden p-4">
+            {/* Handing props down - we need to modify Board/Column/Card to accept handlers if not using Context */}
+            {/* Note: In Solid, passing callbacks down tree or using Store is fine. 
+                    KanbanBoard renders Column renders Card. 
+                    We need to patch KanbanBoard to pass onClick down. 
+                */}
+            {/* For now, just render Board. We need to update Board to forward clicks. */}
+            {/* Since we can't easily pass props locally without modifying Board.tsx, 
+                    I'll assume global event delegation or update Board.tsx next. 
+                    Actually, let's update Board.tsx to accept onCardClick prop. 
+                */}
+            <KanbanBoard tasks={tasks()} onCardClick={handleTaskClick} onRun={handleTaskRun} />
+            {/* We'll need to patch Board.tsx to bubble events up, or use a Store.
+                    For this sprint, I will assume Board.tsx emits events via a simple global listener or direct prop. 
+                    I'll update Board in next step.
+                 */}
+          </div>
+        </Show>
+
+        <Show when={activeTabId() === 'cli' || (activeTabId() !== 'board' && activeTabId() !== 'cli')}>
+          <VirtualList
+            items={tabOutputs()[activeTabId()] || []}
+            rowHeight={24}
+            height="100%"
+            scrollToBottom={true}
+            renderRow={(line) => (
+              <div class={`line line-${line.type}`}>{line.text || '\u00A0'}</div>
+            )}
+          />
+        </Show>
 
         <form onSubmit={handleSubmit} class="input-line" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: '#0d0d0d' }}>
-          <span class="prompt">$</span>
+          <span class="prompt">{activeTabId() === 'cli' ? '$' : '#'}</span>
           <input
             ref={inputRef}
             type="text"
@@ -152,6 +261,18 @@ const App: Component = () => {
           />
         </form>
       </div>
+
+      {/* Modal Portal */}
+      <Show when={selectedTask()}>
+        <PromptModal
+          task={selectedTask()!}
+          isOpen={isModalOpen()}
+          onClose={() => setIsModalOpen(false)}
+          onRun={handleTaskRun}
+          onSave={handleTaskSave}
+        />
+      </Show>
+
     </div>
   );
 };

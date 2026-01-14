@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.1.0] - 2026-01-14
+
+### Added
+- **Gemini 3.0 Pro Upgrade**: Switched Deep Research Agent to `gemini-3-pro-preview` with **Google Search Grounding** (`google_search`).
+- **Multi-Tab Interface**: New tab bar in frontend. Use `open <taskId>` to view task-specific output history alongside the main terminal.
+- **Synchronous Research**: Migrated from legacy polling API to `generateContent` API for faster, more reliable research.
+
+### Fixed
+- **Deep Research Stalls**: Resolved timeouts caused by legacy API deprecation by implementing synchronous architecture.
+- **Frontend Build**: Fixed type errors in `TabBar` component.
+
 ## [2.2.0] - 2026-01-13
 
 ### Fixed

@@ -9,11 +9,10 @@ interface Props {
 
 /** Ordered status columns for the Kanban board */
 const STATUSES: readonly ContentStatus[] = [
-    'backlog',
-    'researching',
-    'drafting',
-    'review',
-    'published',
+    'draft',
+    'queued',
+    'generating',
+    'deployed',
 ] as const;
 
 /**
@@ -55,7 +54,7 @@ function groupByStatus(tasks: CMSTask[]): Map<ContentStatus, CMSTask[]> {
  *
  * @param props.tasks - Array of CMSTask objects to display
  */
-export const KanbanBoard: Component<Props> = (props) => {
+export const KanbanBoard: Component<Props & { onCardClick?: (t: CMSTask) => void, onRun?: (id: string) => void }> = (props) => {
     // Memoize grouping: only recalculates when props.tasks changes
     const grouped = createMemo(() => groupByStatus(props.tasks));
 
@@ -63,7 +62,12 @@ export const KanbanBoard: Component<Props> = (props) => {
         <div class="flex gap-4 min-h-full pb-6 overflow-x-auto">
             <For each={STATUSES}>
                 {(status) => (
-                    <KanbanColumn status={status} tasks={grouped().get(status) || []} />
+                    <KanbanColumn
+                        status={status}
+                        tasks={grouped().get(status) || []}
+                        onCardClick={props.onCardClick}
+                        onRun={props.onRun}
+                    />
                 )}
             </For>
         </div>

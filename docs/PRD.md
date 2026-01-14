@@ -21,9 +21,10 @@
 | Commands: ls, add, mv, clear, help | ✅ |
 | SQLite Durable Object backend | ✅ |
 | WebSocket real-time sync | ✅ |
-| Deep Research Agent (Daily Task) | ✅ |
+| Deep Research Agent (Gemini 3.0 Pro) | ✅ |
 | Telegram Reports | ✅ |
 | Virtual Scrolling (10k+ lines) | ✅ |
+| Multi-Tab Terminal Interface | ✅ |
 | 6KB gzipped bundle | ✅ |
 
 ---
