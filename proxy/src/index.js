@@ -15,9 +15,18 @@ export default {
         //    url.pathname = url.pathname.replace('/1', '');
         // }
 
-        const proxyRequest = new Request(url, request);
+        const proxyRequest = new Request(url, {
+            ...request,
+            headers: {
+                ...request.headers,
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache'
+            }
+        });
 
-        // Fetch from Pages
-        return fetch(proxyRequest);
+        const response = await fetch(proxyRequest);
+        const newResponse = new Response(response.body, response);
+        newResponse.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+        return newResponse;
     }
 };
