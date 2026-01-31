@@ -34,6 +34,7 @@ Velocity uses a **local-first** architecture with **edge synchronization**.
 |-----------|---------|
 | `index.ts` | Worker Entry Point (WebSocket Fix) |
 | `ProjectBrain.ts` | Durable Object (State, Cron, Telegram) |
+| `Generator.ts` | Report Formatting Engine (Elixir-style) |
 | `prompts.ts` | Research Prompt Templates (Epistemic, Rotary, etc) |
 | `deepResearch.ts` | Gemini Agent Client |
 | `proxy/` | Subpath Routing Worker |

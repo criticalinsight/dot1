@@ -1,0 +1,31 @@
+{
+  "name": "lipawealth",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "deploy": "bun run build && bun x wrangler pages deploy dist --project-name=lipawealth"
+  },
+  "dependencies": {
+    "@types/three": "^0.182.0",
+    "gsap": "^3.14.2",
+    "lenis": "^1.3.17",
+    "lipa-engine": "file:./lipa-engine/pkg",
+    "solid-js": "^1.9.10",
+    "three": "^0.182.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.18",
+    "@types/node": "^24.10.1",
+    "lucide-solid": "^0.563.0",
+    "tailwindcss": "^4.1.18",
+    "typescript": "~5.9.3",
+    "vite": "^7.2.4",
+    "vite-plugin-solid": "^2.11.10",
+    "vite-plugin-top-level-await": "^1.6.0",
+    "vite-plugin-wasm": "^3.5.0"
+  }
+}

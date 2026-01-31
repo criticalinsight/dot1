@@ -5,6 +5,8 @@ import type { CMSTask, ContentStatus } from '../../../../shared/types';
 
 interface Props {
     tasks: CMSTask[];
+    onSearchChange?: (val: string) => void;
+    onDeployAll?: () => void;
 }
 
 /** Ordered status columns for the Kanban board */
@@ -59,19 +61,52 @@ export const KanbanBoard: Component<Props & { onCardClick?: (t: CMSTask) => void
     const grouped = createMemo(() => groupByStatus(props.tasks));
 
     return (
-        <div class="flex gap-4 min-h-full pb-6 overflow-x-auto">
-            <For each={STATUSES}>
-                {(status) => (
-                    <KanbanColumn
-                        status={status}
-                        tasks={grouped().get(status) || []}
-                        onCardClick={props.onCardClick}
-                        onRun={props.onRun}
-                        onRunAll={status === 'draft' ? props.onRunAll : undefined}
-                        onAdd={status === 'draft' ? props.onAdd : undefined}
-                    />
-                )}
-            </For>
+        <div class="flex flex-col h-full">
+            {/* Premium Search Header */}
+            <div class="flex items-center justify-between mb-8 px-2">
+                <div class="flex items-center gap-6">
+                    <h1 class="text-2xl font-black tracking-tighter text-white uppercase italic">
+                        Research <span class="text-indigo-500">Board</span>
+                    </h1>
+                    <div class="relative group">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500 group-focus-within:text-indigo-500 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="Find insight..."
+                            onInput={(e) => props.onSearchChange?.(e.currentTarget.value)}
+                            class="bg-slate-900/50 border border-slate-800 rounded-full py-2 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 w-64 glass animate-spring"
+                        />
+                    </div>
+                </div>
+                <div class="flex gap-3">
+                    <button class="glass px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest hover:bg-white/10 transition-all hover-lift">
+                        Global Settings
+                    </button>
+                    <button
+                        onClick={() => props.onDeployAll?.()}
+                        class="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-full text-xs font-bold uppercase tracking-widest shadow-lg shadow-indigo-500/20 transition-all hover-lift"
+                    >
+                        Deploy All
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex gap-6 pb-6 overflow-x-auto h-full scrollbar-hide">
+                <For each={STATUSES}>
+                    {(status) => (
+                        <KanbanColumn
+                            status={status}
+                            tasks={grouped().get(status) || []}
+                            onCardClick={props.onCardClick}
+                            onRun={props.onRun}
+                            onRunAll={status === 'draft' ? props.onRunAll : undefined}
+                            onAdd={status === 'draft' ? props.onAdd : undefined}
+                        />
+                    )}
+                </For>
+            </div>
         </div>
     );
 };

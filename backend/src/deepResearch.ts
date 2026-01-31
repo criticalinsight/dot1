@@ -12,13 +12,12 @@ export class DeepResearchClient {
     constructor(private apiKey: string) { }
 
     /**
-     * Starts a deep research task.
+     * Starts a streaming deep research task.
      * @param prompt - The research query/instructions
-     * @returns Operation name to poll
      */
-    async startResearch(prompt: string): Promise<string> {
-        const model = 'gemini-3-pro-preview';
-        const url = `${this.baseUrl}/models/${model}:generateContent?key=${this.apiKey}`;
+    async *streamResearch(prompt: string): AsyncGenerator<string> {
+        const model = 'gemini-2.0-flash'; // Stable streaming model
+        const url = `${this.baseUrl}/models/${model}:streamGenerateContent?key=${this.apiKey}&alt=sse`;
 
         const response = await fetch(url, {
             method: 'POST',
@@ -37,15 +36,44 @@ export class DeepResearchClient {
             throw new Error(`Gemini API Error: ${response.status} ${await response.text()}`);
         }
 
-        const data = await response.json() as any;
+        const reader = response.body?.getReader();
+        if (!reader) throw new Error('Failed to read response body');
 
-        // Extract text from candidates
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!text) {
-            throw new Error('No content returned from Gemini');
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    try {
+                        const json = JSON.parse(line.replace('data: ', '').trim());
+                        const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+                        if (text) yield text;
+                    } catch (e) {
+                        // Incomplete JSON or other SSE noise
+                    }
+                }
+            }
         }
+    }
 
-        return text;
+    /**
+     * Legacy non-streaming method (backwards compatibility).
+     */
+    async startResearch(prompt: string): Promise<string> {
+        let fullText = '';
+        for await (const chunk of this.streamResearch(prompt)) {
+            fullText += chunk;
+        }
+        return fullText;
     }
 
     // Deprecated: No polling needed for standard API

@@ -1,5 +1,5 @@
 import type { Component } from 'solid-js';
-import { Show } from 'solid-js';
+import { Show, For } from 'solid-js';
 import type { CMSTask } from '../../../../shared/types';
 
 interface Props {
@@ -20,43 +20,59 @@ export const KanbanCard: Component<Props> = (props) => {
 
     return (
         <div
-            class="group bg-slate-900 border border-slate-800 rounded-lg p-3 hover:border-blue-500/40 transition-colors cursor-pointer relative"
+            class="kanban-card group relative overflow-hidden"
             onClick={() => props.onClick?.(props.task)}
         >
+            {/* Glossy Overlay for Hover */}
+            <div class="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+
             {/* Header: ID + Model */}
-            <div class="flex items-center justify-between mb-2">
-                <span class="text-[9px] font-mono text-slate-600 block">
-                    {props.task.id.slice(0, 8)}
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-[9px] font-black tracking-widest text-slate-500 uppercase">
+                    SIG-{props.task.id.slice(0, 6)}
                 </span>
                 <Show when={props.task.model}>
-                    <span class="text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700">
+                    <span class="text-[9px] font-bold bg-white/5 text-indigo-300 px-2 py-0.5 rounded-full border border-white/10">
                         {props.task.model}
                     </span>
                 </Show>
             </div>
 
             {/* Prompt Body */}
-            <h4 class="text-xs font-medium text-slate-300 leading-snug mb-2 font-mono">
-                {truncate(props.task.prompt || props.task.title, 80)}
+            <h4 class="text-sm font-bold text-slate-200 leading-relaxed mb-3 group-hover:text-white transition-colors">
+                {truncate(props.task.prompt || props.task.title, 120)}
             </h4>
+
+            {/* Taxonomy Tags */}
+            <Show when={props.task.tags && props.task.tags.length > 0}>
+                <div class="flex flex-wrap gap-1.5 mb-3">
+                    <For each={props.task.tags}>{(tag) => (
+                        <span class="text-[8px] font-black uppercase tracking-wider bg-indigo-500/10 text-indigo-400 px-1.5 py-0.5 rounded shadow-sm">
+                            #{tag}
+                        </span>
+                    )}</For>
+                </div>
+            </Show>
 
             {/* Output Snippet (if deployed) */}
             <Show when={isGenerated && props.task.output}>
-                <div class="mb-2 p-2 bg-slate-950/50 rounded border border-slate-800/50 text-[10px] text-slate-500 font-mono italic">
-                    {truncate(props.task.output!, 50)}
+                <div class="mb-3 p-3 bg-black/20 rounded-lg border border-white/5 text-[11px] text-slate-400 font-mono leading-relaxed">
+                    {truncate(props.task.output!, 80)}
                 </div>
             </Show>
 
             {/* Footer: Metrics & Actions */}
-            <div class="flex items-center justify-between mt-2 pt-2 border-t border-slate-800/50">
-                <div class="flex gap-2">
+            <div class="flex items-center justify-between mt-4 pt-4 border-t border-white/5">
+                <div class="flex gap-4">
                     <Show when={tokens}>
-                        <span class="text-[9px] text-slate-500" title="Input Tokens">
-                            In: {tokens?.input || 0}
-                        </span>
-                        <span class="text-[9px] text-slate-500" title="Output Tokens">
-                            Out: {tokens?.output || 0}
-                        </span>
+                        <div class="flex flex-col">
+                            <span class="text-[8px] font-black text-slate-600 uppercase tracking-tighter">Inbound</span>
+                            <span class="text-[10px] tabular-nums font-bold text-slate-400">{tokens?.input || 0}</span>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-[8px] font-black text-slate-600 uppercase tracking-tighter">Outbound</span>
+                            <span class="text-[10px] tabular-nums font-bold text-slate-400">{tokens?.output || 0}</span>
+                        </div>
                     </Show>
                 </div>
 
@@ -64,11 +80,14 @@ export const KanbanCard: Component<Props> = (props) => {
                 <div class="flex gap-2">
                     <Show when={props.task.status === 'draft'}>
                         <button
-                            class="text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-2 py-0.5 rounded"
+                            class="text-[10px] font-black bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 rounded-full shadow-lg shadow-indigo-500/20 active:scale-95 transition-all uppercase tracking-widest"
                             onClick={(e) => { e.stopPropagation(); props.onRun?.(props.task.id); }}
                         >
-                            Run
+                            Execute
                         </button>
+                    </Show>
+                    <Show when={props.task.status === 'deployed'}>
+                        <div class="size-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] animate-pulse" />
                     </Show>
                 </div>
             </div>

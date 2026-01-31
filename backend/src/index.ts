@@ -20,7 +20,7 @@ export default {
 		if (request.method === 'OPTIONS') {
 			return new Response(null, {
 				headers: {
-					'Access-Control-Allow-Origin': '*',
+					'Access-Control-Allow-Origin': 'https://lynn.moecapital.com',
 					'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 					'Access-Control-Allow-Headers': 'Content-Type',
 					'Access-Control-Max-Age': '86400',
@@ -42,7 +42,7 @@ export default {
 
 		// Add speed headers to response
 		const headers = new Headers(response.headers);
-		headers.set('Access-Control-Allow-Origin', '*');
+		headers.set('Access-Control-Allow-Origin', 'https://lynn.moecapital.com');
 		headers.set('Vary', 'Accept-Encoding');
 		// Phase 8: Required for SharedArrayBuffer / High-Res Timers
 		headers.set('Cross-Origin-Opener-Policy', 'same-origin');

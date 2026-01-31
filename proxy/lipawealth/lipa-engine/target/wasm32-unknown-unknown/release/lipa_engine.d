@@ -1,0 +1,1 @@
+/Users/brixelectronics/Documents/mac/dot1/proxy/lipawealth/lipa-engine/target/wasm32-unknown-unknown/release/lipa_engine.wasm: /Users/brixelectronics/Documents/mac/dot1/proxy/lipawealth/lipa-engine/src/lib.rs

@@ -55,18 +55,18 @@ export const KanbanColumn: Component<Props & { onCardClick?: (t: CMSTask) => voi
     });
 
     return (
-        <div class="flex-shrink-0 w-72 flex flex-col gap-3">
-            <div class="flex items-center justify-between px-1">
-                <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+        <div class="kanban-column h-full flex flex-col">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
                     {STATUS_LABELS[props.status]}
-                    <span class="bg-slate-800/80 text-slate-500 px-1.5 py-0.5 rounded text-[10px] tabular-nums">
+                    <span class="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded text-[10px] blur-sm hover:blur-none transition-all tabular-nums">
                         {props.tasks.length}
                     </span>
                 </h3>
                 <div class="flex items-center gap-2">
                     <Show when={props.status === 'draft' && props.onAdd}>
                         <button
-                            class="text-slate-500 hover:text-white transition-colors"
+                            class="text-slate-500 hover:text-white transition-all bg-white/5 hover:bg-white/10 p-1.5 rounded-full"
                             onClick={() => setIsAdding(true)}
                             title="Add Task"
                         >
@@ -75,7 +75,7 @@ export const KanbanColumn: Component<Props & { onCardClick?: (t: CMSTask) => voi
                     </Show>
                     <Show when={props.status === 'draft' && props.tasks.length > 0}>
                         <button
-                            class="text-[10px] font-bold text-blue-500 hover:text-blue-400 hover:bg-blue-900/30 px-2 py-0.5 rounded transition-colors uppercase tracking-tight"
+                            class="text-[10px] font-black text-indigo-400 hover:text-white bg-indigo-500/10 hover:bg-indigo-500 border border-indigo-500/20 px-3 py-1 rounded-full transition-all uppercase tracking-tight"
                             onClick={props.onRunAll}
                         >
                             Run All
@@ -84,21 +84,21 @@ export const KanbanColumn: Component<Props & { onCardClick?: (t: CMSTask) => voi
                 </div>
             </div>
 
-            <div class="flex-1 flex flex-col gap-2 min-h-[400px] p-2 bg-slate-900/30 rounded-xl border border-slate-800/50">
+            <div class="flex-1 overflow-y-auto pr-1 space-y-4">
                 <Show when={isAdding()}>
-                    <form onSubmit={handleSubmit} class="p-3 bg-slate-900 rounded-lg border border-blue-500/50 shadow-lg">
+                    <form onSubmit={handleSubmit} class="glass p-4 rounded-xl border-indigo-500/30 shadow-2xl animate-spring mb-6">
                         <input
                             ref={inputRef}
                             type="text"
                             value={newTitle()}
                             onInput={(e) => setNewTitle(e.currentTarget.value)}
                             onKeyDown={handleKeyDown}
-                            placeholder="Enter prompt..."
-                            class="w-full bg-transparent border-none text-sm text-white focus:outline-none placeholder:text-slate-600"
+                            placeholder="Prompt instructions..."
+                            class="w-full bg-transparent border-none text-sm text-white focus:outline-none placeholder:text-slate-600 font-mono"
                         />
-                        <div class="flex justify-end gap-2 mt-2">
-                            <button type="button" onClick={() => setIsAdding(false)} class="text-[10px] uppercase font-bold text-slate-500 hover:text-slate-300">Cancel</button>
-                            <button type="submit" class="text-[10px] uppercase font-bold text-blue-500 hover:text-blue-400">Add</button>
+                        <div class="flex justify-end gap-3 mt-4 pt-4 border-t border-slate-800/50">
+                            <button type="button" onClick={() => setIsAdding(false)} class="text-[10px] uppercase font-black text-slate-500 hover:text-slate-300 tracking-widest">Cancel</button>
+                            <button type="submit" class="text-[10px] uppercase font-black text-indigo-400 hover:text-indigo-300 tracking-widest">Add Task</button>
                         </div>
                     </form>
                 </Show>
@@ -112,8 +112,9 @@ export const KanbanColumn: Component<Props & { onCardClick?: (t: CMSTask) => voi
                 }</For>
 
                 <Show when={props.tasks.length === 0 && !isAdding()}>
-                    <div class="flex-1 flex items-center justify-center opacity-30">
-                        <span class="text-[10px] font-bold uppercase tracking-tight">Empty</span>
+                    <div class="flex-1 flex flex-col items-center justify-center opacity-10 py-20 pointer-events-none">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                        <span class="text-[10px] font-black uppercase tracking-[0.3em] mt-2">No signals</span>
                     </div>
                 </Show>
             </div>
